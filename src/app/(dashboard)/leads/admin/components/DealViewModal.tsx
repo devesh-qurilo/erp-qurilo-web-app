@@ -19,7 +19,7 @@ export default function DealViewModal({
             const token = localStorage.getItem("accessToken");
             if (!token) return;
 
-            const res = await fetch(`${BASE}/deals/${deal.id}/files`, {
+            const res = await fetch(`${BASE}/deals/${deal.id}/documents`, {
                 headers: { Authorization: `Bearer ${token}` },
             });
 
@@ -142,9 +142,9 @@ export default function DealViewModal({
 
                             {/* ⭐⭐ YAHI EXACT JAGAH DEALTABS ADD KARNA THA ⭐⭐ */}
                             <DealTabs
+                                dealId={String(deal.id)}
                                 deal={deal}
-                                files={files}
-                                reloadFiles={loadFiles}
+                                onDealUpdated={loadFiles}
                             />
 
                         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useDealCommentsQuery, useDealDocumentsQuery, useDealEmployeesQuery, useDealFollowupsQuery, useDealNotesQuery, useDealTagsQuery } from "../api";
 import { Deal } from "@/types/deals";
 import { format } from "date-fns";
 
@@ -126,199 +127,76 @@ export default function DealTabs({ dealId, deal, onDealUpdated }: DealTabsProps)
     // centralized action menu state to avoid overlap + easy click-away
     const [openActionMenu, setOpenActionMenu] = useState<string | null>(null);
 
+    const documentsQuery = useDealDocumentsQuery(dealId, true);
+    const followupsQuery = useDealFollowupsQuery(dealId, true);
+    const dealEmployeesQuery = useDealEmployeesQuery(dealId, true);
+    const notesQuery = useDealNotesQuery(dealId, true);
+    const tagsQuery = useDealTagsQuery(dealId, true);
+    const commentsQuery = useDealCommentsQuery(dealId, true);
+
+    useEffect(() => {
+        setDocsLoading(documentsQuery.isLoading);
+        setDocsError(documentsQuery.error ? documentsQuery.error.message : null);
+        if (documentsQuery.data) {
+            setDocuments(documentsQuery.data as DocumentItem[]);
+        }
+    }, [documentsQuery.data, documentsQuery.error, documentsQuery.isLoading]);
+
+    useEffect(() => {
+        setFollowupsLoading(followupsQuery.isLoading);
+        setFollowupsError(followupsQuery.error ? followupsQuery.error.message : null);
+        if (followupsQuery.data) {
+            setFollowups(followupsQuery.data as Followup[]);
+        }
+    }, [followupsQuery.data, followupsQuery.error, followupsQuery.isLoading]);
+
+    useEffect(() => {
+        setEmployeesLoading(dealEmployeesQuery.isLoading);
+        setEmployeesError(dealEmployeesQuery.error ? dealEmployeesQuery.error.message : null);
+        if (dealEmployeesQuery.data) {
+            setAssignedEmployees(
+                dealEmployeesQuery.data.map((employee) => ({
+                    employeeId: employee.employeeId,
+                    name: employee.name,
+                    designation: employee.designationName ?? undefined,
+                    department: employee.departmentName ?? undefined,
+                    profileUrl: employee.profilePictureUrl ?? undefined,
+                }))
+            );
+        }
+    }, [dealEmployeesQuery.data, dealEmployeesQuery.error, dealEmployeesQuery.isLoading]);
+
+    useEffect(() => {
+        setNotesLoading(notesQuery.isLoading);
+        setNotesError(notesQuery.error ? notesQuery.error.message : null);
+        if (notesQuery.data) {
+            setNotes(notesQuery.data as NoteItem[]);
+        }
+    }, [notesQuery.data, notesQuery.error, notesQuery.isLoading]);
+
+    useEffect(() => {
+        setTagsLoading(tagsQuery.isLoading);
+        setTagsError(tagsQuery.error ? tagsQuery.error.message : null);
+        if (tagsQuery.data) {
+            setTags(tagsQuery.data as (TagItem | string)[]);
+        }
+    }, [tagsQuery.data, tagsQuery.error, tagsQuery.isLoading]);
+
+    const dealComments = commentsQuery.data ?? ((deal.comments as any[]) || []);
+
     // ---- FETCHERS ----
 
-    // fetch documents list & employeeIds
-    useEffect(() => {
-        if (!dealId) return;
-        const fetchDocs = async () => {
-            setDocsLoading(true);
-            setDocsError(null);
-            try {
-                const token = localStorage.getItem("accessToken");
-                if (!token) {
-                    setDocsError("No access token found");
-                    setDocsLoading(false);
-                    return;
-                }
-
-                const res = await fetch(`${BASE_URL}/deals/${dealId}/documents`, {
-                    headers: { Authorization: `Bearer ${token}` },
-                });
-
-                if (!res.ok) {
-                    const txt = await res.text().catch(() => "");
-                    throw new Error(`Failed to fetch documents: ${res.status} ${txt}`);
-                }
-
-                const json = await res.json();
-                if (Array.isArray(json)) {
-                    setDocuments(json);
-                } else {
-                    if (Array.isArray(json.employeeIds)) setDocEmployeeIds(json.employeeIds);
-                    if (Array.isArray((json as any).documents)) setDocuments((json as any).documents);
-                }
-            } catch (err: any) {
-                console.error(err);
-                setDocsError(err.message || "Failed to load documents");
-            } finally {
-                setDocsLoading(false);
-            }
-        };
-
-        fetchDocs();
-    }, [dealId]);
-
-    // fetch followups
-    useEffect(() => {
-        if (!dealId) return;
-        const fetchFollowups = async () => {
-            setFollowupsLoading(true);
-            setFollowupsError(null);
-            try {
-                const token = localStorage.getItem("accessToken");
-                if (!token) {
-                    setFollowupsError("No access token found");
-                    setFollowupsLoading(false);
-                    return;
-                }
-                const res = await fetch(`${BASE_URL}/deals/${dealId}/followups`, {
-                    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-                });
-                if (!res.ok) {
-                    const txt = await res.text().catch(() => "");
-                    throw new Error(`Failed to fetch followups: ${res.status} ${txt}`);
-                }
-                const json = await res.json();
-                if (Array.isArray(json)) setFollowups(json);
-            } catch (err: any) {
-                console.error(err);
-                setFollowupsError(err.message || "Failed to load followups");
-            } finally {
-                setFollowupsLoading(false);
-            }
-        };
-
-        fetchFollowups();
-    }, [dealId]);
-
-    // fetch assigned employees
     const fetchAssignedEmployees = async () => {
-        if (!dealId) return;
-        setEmployeesLoading(true);
-        setEmployeesError(null);
-        try {
-            const token = localStorage.getItem("accessToken");
-            if (!token) {
-                setEmployeesError("No access token found");
-                setEmployeesLoading(false);
-                return;
-            }
-
-            const res = await fetch(`${BASE_URL}/deals/${dealId}/employees`, {
-                headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-            });
-
-            if (!res.ok) {
-                const txt = await res.text().catch(() => "");
-                throw new Error(`Failed to fetch employees: ${res.status} ${txt}`);
-            }
-
-            const json = await res.json();
-            if (Array.isArray(json)) {
-                setAssignedEmployees(json);
-            } else if (Array.isArray((json as any).employees)) {
-                setAssignedEmployees((json as any).employees);
-            } else {
-                setAssignedEmployees([]);
-            }
-        } catch (err: any) {
-            console.error(err);
-            setEmployeesError(err.message || "Failed to load employees");
-        } finally {
-            setEmployeesLoading(false);
-        }
+        await dealEmployeesQuery.refetch();
     };
 
-    useEffect(() => {
-        if (!dealId) return;
-        fetchAssignedEmployees();
-    }, [dealId]);
-
-    // fetch notes list
     const fetchNotes = async () => {
-        if (!dealId) return;
-        setNotesLoading(true);
-        setNotesError(null);
-        try {
-            const token = localStorage.getItem("accessToken");
-            if (!token) {
-                setNotesError("No access token found");
-                setNotesLoading(false);
-                return;
-            }
-            const res = await fetch(`${BASE_URL}/deals/${dealId}/notes`, {
-                headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-            });
-            if (!res.ok) {
-                const txt = await res.text().catch(() => "");
-                throw new Error(`Failed to fetch notes: ${res.status} ${txt}`);
-            }
-            const json = await res.json();
-            if (Array.isArray(json)) setNotes(json);
-            else setNotes([]);
-        } catch (err: any) {
-            console.error(err);
-            setNotesError(err.message || "Failed to load notes");
-        } finally {
-            setNotesLoading(false);
-        }
+        await notesQuery.refetch();
     };
 
-    useEffect(() => {
-        if (!dealId) return;
-        fetchNotes();
-    }, [dealId]);
-
-    // fetch tags list
     const fetchTags = async () => {
-        if (!dealId) return;
-        setTagsLoading(true);
-        setTagsError(null);
-        try {
-            const token = localStorage.getItem("accessToken");
-            if (!token) {
-                setTagsError("No access token found");
-                setTagsLoading(false);
-                return;
-            }
-            const res = await fetch(`${BASE_URL}/deals/${dealId}/tags`, {
-                headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-            });
-            if (!res.ok) {
-                const txt = await res.text().catch(() => "");
-                throw new Error(`Failed to fetch tags: ${res.status} ${txt}`);
-            }
-            const json = await res.json();
-
-            // server might return either array of objects or array of strings
-            if (Array.isArray(json)) {
-                setTags(json); // keep raw array (could be string[] or TagItem[])
-            } else {
-                setTags([]);
-            }
-        } catch (err: any) {
-            console.error(err);
-            setTagsError(err.message || "Failed to load tags");
-        } finally {
-            setTagsLoading(false);
-        }
+        await tagsQuery.refetch();
     };
-
-    useEffect(() => {
-        if (!dealId) return;
-        fetchTags();
-    }, [dealId]);
 
     // When Add People modal opens we fetch assigned employees, departments and employee pool.
     const openAddPeopleModal = async () => {
@@ -354,7 +232,7 @@ export default function DealTabs({ dealId, deal, onDealUpdated }: DealTabsProps)
                 }
             }
 
-            const empRes = await fetch(`${BASE_URL}/employee/all?page=0&size=2000`, {
+            const empRes = await fetch(`${BASE_URL}/employee/all`, {
                 headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
             });
 
@@ -575,8 +453,7 @@ export default function DealTabs({ dealId, deal, onDealUpdated }: DealTabsProps)
                     const txt = await res.text().catch(() => "");
                     throw new Error(`Failed to update followup: ${res.status} ${txt}`);
                 }
-                const updated = await res.json();
-                setFollowups((prev) => prev.map((p) => (p.id === updated.id ? updated : p)));
+                await followupsQuery.refetch();
             } else {
                 const res = await fetch(`${BASE_URL}/deals/${dealId}/followups`, {
                     method: "POST",
@@ -590,8 +467,7 @@ export default function DealTabs({ dealId, deal, onDealUpdated }: DealTabsProps)
                     const txt = await res.text().catch(() => "");
                     throw new Error(`Failed to create followup: ${res.status} ${txt}`);
                 }
-                const created = await res.json();
-                setFollowups((prev) => [created, ...prev]);
+                await followupsQuery.refetch();
             }
 
             closeFollowupModal();
@@ -620,7 +496,7 @@ export default function DealTabs({ dealId, deal, onDealUpdated }: DealTabsProps)
                 const txt = await res.text().catch(() => "");
                 throw new Error(`Failed to delete followup: ${res.status} ${txt}`);
             }
-            setFollowups((prev) => prev.filter((f) => f.id !== id));
+            await followupsQuery.refetch();
         } catch (err: any) {
             console.error(err);
             alert(err?.message || "Failed to delete followup");
@@ -870,6 +746,7 @@ export default function DealTabs({ dealId, deal, onDealUpdated }: DealTabsProps)
                 throw new Error(`Failed to save comment: ${res.status} ${txt}`);
             }
 
+            await commentsQuery.refetch();
             if (onDealUpdated) {
                 await onDealUpdated();
             }
@@ -907,6 +784,7 @@ export default function DealTabs({ dealId, deal, onDealUpdated }: DealTabsProps)
                 throw new Error(`Failed to delete comment: ${res.status} ${txt}`);
             }
 
+            await commentsQuery.refetch();
             if (onDealUpdated) {
                 await onDealUpdated();
             }
@@ -1008,8 +886,7 @@ export default function DealTabs({ dealId, deal, onDealUpdated }: DealTabsProps)
                 throw new Error(`Failed to upload document: ${res.status} ${txt}`);
             }
 
-            const json = await res.json();
-            setDocuments((prev) => [json as DocumentItem, ...prev]);
+            await documentsQuery.refetch();
 
             setSelectedFile(null);
             setSelectedFileName(null);
@@ -1044,7 +921,7 @@ export default function DealTabs({ dealId, deal, onDealUpdated }: DealTabsProps)
                 throw new Error(`Failed to delete document: ${res.status} ${txt}`);
             }
 
-            setDocuments((prev) => prev.filter((d) => d.id !== docId));
+            await documentsQuery.refetch();
         } catch (err: any) {
             console.error(err);
             alert(err?.message || "Failed to delete document");
@@ -1669,15 +1546,15 @@ export default function DealTabs({ dealId, deal, onDealUpdated }: DealTabsProps)
                                 </div>
 
                                 <div>
-                                    {(!deal.comments || deal.comments.length === 0) && (
+                                    {(!dealComments || dealComments.length === 0) && (
                                         <div className="p-6 text-sm text-gray-500">
                                             No comments yet.
                                         </div>
                                     )}
 
-                                    {deal.comments &&
-                                        deal.comments.length > 0 &&
-                                        deal.comments.map((c: any, idx: number) => (
+                                    {dealComments &&
+                                        dealComments.length > 0 &&
+                                        dealComments.map((c: any, idx: number) => (
                                             <div
                                                 key={
                                                     c.id ||

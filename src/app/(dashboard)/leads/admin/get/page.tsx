@@ -1,6 +1,5 @@
 "use client";
 
-import useSWR from "swr";
 import { useMemo, useState, useCallback, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -32,6 +31,8 @@ import ImportButton from "@/components/ImportButton";
 import ExportButton from "@/components/ExportButton";
 import Skeleton from "@/components/Skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
+
+import { useAdminLeadsQuery, useConvertLeadMutation, useCreateLeadMutation, useDealCategoriesQuery, useDeleteLeadMutation, useLeadEmployeesQuery, useLeadSourcesQuery } from "../api";
 
 
 /* =======================
@@ -176,33 +177,17 @@ const defaultPipelines = PIPELINES;
   // const defaultPipelines = ["Default Pipeline", "Sales Pipeline", "Enterprise Pipeline"];
   const defaultDealStages = ["Generated", "Qualified", "Proposal", "Lost"];
 
-  const [dealCategories, setDealCategories] = useState<DealCategoryItem[]>([]);
-  const [leadSources, setLeadSources] = useState<LeadSourceItem[]>([]);
-  const [clientCategories, setClientCategories] = useState<DealCategoryItem[]>([]);
+  const createLeadMutation = useCreateLeadMutation();
+  const dealCategoriesQuery = useDealCategoriesQuery({ staleTime: 60 * 1000, refetchOnWindowFocus: false });
+  const leadSourcesQuery = useLeadSourcesQuery({ staleTime: 60 * 1000, refetchOnWindowFocus: false });
 
-  useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) return;
-    (async () => {
-      try {
-        const res1 = await fetch(`${BASE}/deals/dealCategory`, { headers: { Authorization: `Bearer ${token}` } });
-        if (res1.ok) {
-          const json = await res1.json();
-          if (Array.isArray(json)) {
-            setDealCategories(json);
-            setClientCategories(json);
-          }
-        }
-        const res2 = await fetch(`${BASE}/deals/dealCategory/LeadSource`, { headers: { Authorization: `Bearer ${token}` } });
-        if (res2.ok) {
-          const json2 = await res2.json();
-          if (Array.isArray(json2)) setLeadSources(json2);
-        }
-      } catch {
-        // ignore
-      }
-    })();
-  }, []);
+  const dealCategories: DealCategoryItem[] = (dealCategoriesQuery.data ?? [])
+    .map((item) => ({ id: item.id, categoryName: item.categoryName || item.name || "" }))
+    .filter((item) => item.categoryName);
+  const clientCategories: DealCategoryItem[] = dealCategories;
+  const leadSources: LeadSourceItem[] = (leadSourcesQuery.data ?? [])
+    .map((item) => ({ id: item.id, name: item.name || "" }))
+    .filter((item) => item.name);
 
   const emptyDeal: DealPayload = {
     title: "",
@@ -350,17 +335,7 @@ const defaultPipelines = PIPELINES;
         companyAddress: payload.companyAddress || undefined,
       };
 
-      const res = await fetch(`${BASE}/leads`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        throw new Error(txt || "Failed to create lead");
-      }
-
+      await createLeadMutation.mutateAsync(body);
       onCreated();
       alert("Lead created successfully.");
     } catch (err: any) {
@@ -374,25 +349,14 @@ const defaultPipelines = PIPELINES;
     setAddModalOpen(type);
     setAddName("");
     setLoadingAddList(true);
-    setAddListItems([]);
     try {
-      const token = localStorage.getItem("accessToken");
-      if (!token) throw new Error("No token");
       if (type === "leadSource") {
-        const res = await fetch(`${BASE}/deals/dealCategory/LeadSource`, { headers: { Authorization: `Bearer ${token}` } });
-        if (res.ok) {
-          const json = await res.json();
-          if (Array.isArray(json)) setAddListItems(json);
-        }
+        await leadSourcesQuery.refetch();
+        setAddListItems(leadSources);
       } else {
-        const res = await fetch(`${BASE}/deals/dealCategory`, { headers: { Authorization: `Bearer ${token}` } });
-        if (res.ok) {
-          const json = await res.json();
-          if (Array.isArray(json)) setAddListItems(json);
-        }
+        await dealCategoriesQuery.refetch();
+        setAddListItems(type === "clientCategory" ? clientCategories : dealCategories);
       }
-    } catch {
-      // ignore
     } finally {
       setLoadingAddList(false);
     }
@@ -424,12 +388,12 @@ const defaultPipelines = PIPELINES;
       }
       const created = await res.json();
       if (type === "leadSource") {
-        setLeadSources((prev) => [{ id: created.id, name: created.name || addName.trim() }, ...prev]);
+        await leadSourcesQuery.refetch();
         setPayload((p) => ({ ...p, leadSource: created.name || addName.trim() }));
       } else {
-        setDealCategories((prev) => [{ id: created.id, categoryName: created.categoryName || addName.trim() }, ...prev]);
-        setClientCategories((prev) => [{ id: created.id, categoryName: created.categoryName || addName.trim() }, ...prev]);
-        setPayload((p) => ({ ...p, deal: { ...(p.deal as DealPayload), dealCategory: created.categoryName || addName.trim() }, clientCategory: created.categoryName || addName.trim() }));
+        await dealCategoriesQuery.refetch();
+        const categoryValue = created.categoryName || created.name || addName.trim();
+        setPayload((p) => ({ ...p, deal: { ...(p.deal as DealPayload), dealCategory: categoryValue }, clientCategory: categoryValue }));
       }
       setAddName("");
       setAddModalOpen(null);
@@ -493,7 +457,7 @@ const defaultPipelines = PIPELINES;
             <div className="flex gap-2">
               <select className="flex-1 border rounded-md px-3 py-2 text-sm" value={payload.clientCategory} onChange={(e) => update("clientCategory", e.target.value)}>
                 <option value="">--</option>
-                {clientCategories.map((c) => <option key={c.id} value={c.categoryName}>{c.categoryName}</option>)}
+                {clientCategories.map((c) => { const label = c.categoryName || (c as any).name || ""; return <option key={c.id} value={label}>{label}</option>; })}
               </select>
               <button type="button" onClick={() => openAddModal("clientCategory")} className="px-3 py-2 rounded border text-sm">Add</button>
             </div>
@@ -580,7 +544,7 @@ Auto Convert lead to client when the deal stage is set to "WIN".</label>
             <div>
               <label className="block text-xs text-left text-muted-foreground mb-1">Deal Stage  *</label>
               <select className="w-full border rounded-md px-3 py-2 text-sm" value={payload.deal!.dealStage} onChange={(e) => updateDeal("dealStage", e.target.value)}>
-                {defaultDealStages.map((s) => <option key={s} value={s}>{s}</option>)}
+                {defaultDealStages.map((s) => <option key={s} value={s}>{s === "WIN" ? "Win" : s === "LOST" ? "Lost" : s}</option>)}
               </select>
             </div>
 
@@ -602,7 +566,7 @@ Auto Convert lead to client when the deal stage is set to "WIN".</label>
               <div className="flex gap-2">
                 <select className="flex-1 border rounded-md px-3 py-2 text-sm" value={payload.deal!.dealCategory} onChange={(e) => updateDeal("dealCategory", e.target.value)}>
                   <option value="">--</option>
-                  {dealCategories.map((d) => <option key={d.id} value={d.categoryName}>{d.categoryName}</option>)}
+                  {dealCategories.map((d) => { const label = d.categoryName || (d as any).name || ""; return <option key={d.id} value={label}>{label}</option>; })}
                 </select>
                 <button type="button" onClick={() => openAddModal("dealCategory")} className="px-3 py-2 rounded border text-sm">Add</button>
               </div>
@@ -1047,15 +1011,29 @@ function LeadRow({
    ======================= */
 export default function LeadsAdminPage() {
   const router = useRouter();
-  const { data, error, isLoading, mutate } = useSWR<Lead[]>("/api/leads/admin/get", fetcher, {
-    refreshInterval: 30000,
-    revalidateOnFocus: true,
+  const leadsQuery = useAdminLeadsQuery({
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
   });
+  const employeesQuery = useLeadEmployeesQuery({
+    refetchOnWindowFocus: false,
+    staleTime: 60 * 1000,
+  });
+  const deleteLeadMutation = useDeleteLeadMutation();
+  const convertLeadMutation = useConvertLeadMutation();
 
-  const { data: employeesData } = useSWR<{ content?: Employee[] }>(`${BASE}/employee/all?page=0&size=2000`, fetcher, {
-    revalidateOnFocus: false,
-  });
-  const employees = (employeesData && (employeesData as any).content) ? (employeesData as any).content : (employeesData as unknown as Employee[]) || [];
+  const data = leadsQuery.data;
+  const error = leadsQuery.error;
+  const isLoading = leadsQuery.isLoading;
+  const mutate = async () => {
+    await leadsQuery.refetch();
+  };
+
+  const employees = (employeesQuery.data ?? []).map((employee) => ({
+    employeeId: employee.employeeId,
+    name: employee.name,
+    designation: employee.designationName ?? undefined,
+  }));
 
   // UI state
   const [query, setQuery] = useState("");
@@ -1161,14 +1139,7 @@ export default function LeadsAdminPage() {
     if (!confirm("Are you sure you want to convert this lead to a client?")) return;
     try {
       const accessToken = localStorage.getItem("accessToken");
-      const res = await fetch(`/api/leads/admin/${id}/convert`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          "Content-Type": "application/json",
-        },
-      });
-      if (!res.ok) throw new Error(await res.text());
+      await convertLeadMutation.mutateAsync(id);
       alert("Lead converted to client.");
       await mutate();
     } catch (err: any) {
@@ -1180,15 +1151,8 @@ export default function LeadsAdminPage() {
     if (!confirm("Are you sure you want to delete this lead? This action cannot be undone.")) return;
     try {
       const accessToken = localStorage.getItem("accessToken");
-      const res = await fetch(`/api/leads/admin/${id}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-          Accept: "application/json",
-        },
-      });
-      if (!res.ok) throw new Error(await res.text());
-      await mutate((current) => (current ? current.filter((l) => l.id !== id) : current), { revalidate: true });
+      await deleteLeadMutation.mutateAsync(id);
+      await mutate();
       alert("Lead deleted.");
     } catch (err: any) {
       alert("Error: " + (err?.message || err));

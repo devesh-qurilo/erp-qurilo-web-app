@@ -2,7 +2,6 @@
 import { useParams } from "next/navigation";
 
 import { useRouter } from "next/navigation";
-import useSWR from "swr";
 import { useState, useRef, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -14,6 +13,8 @@ import { createPortal } from "react-dom";
 
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
+
+import { useConvertLeadMutation, useDeleteLeadMutation, useLeadDealsQuery, useLeadDetailQuery, useLeadEmployeesQuery } from "../../api";
 
 type EmployeeMeta = {
   employeeId?: string;
@@ -97,7 +98,7 @@ type Note = {
 
 const BASE = `${process.env.NEXT_PUBLIC_MAIN}`; // change if needed
 const CREATE_URL = `${BASE}/deals`; // adjust if your create endpoint differs
-const EMP_API = `${BASE}/employee/all?page=0&size=2000`;
+const EMP_API = `${BASE}/employee/all`;
 const CAT_API = `${BASE}/deals/dealCategory`;
 
 const fetcher = async (url: string) => {
@@ -170,7 +171,7 @@ function DealViewModal({
       try {
         const token = localStorage.getItem("accessToken");
         if (!token) return;
-        const res = await fetch(`${BASE}/deals/${deal.id}/files`, {
+        const res = await fetch(`${BASE}/deals/${deal.id}/documents`, {
           headers: {
             Authorization: `Bearer ${token}`,
             Accept: "application/json",
@@ -205,7 +206,7 @@ function DealViewModal({
       const fd = new FormData();
       fd.append("file", selectedFile);
 
-      const res = await fetch(`${BASE}/deals/${deal.id}/files`, {
+      const res = await fetch(`${BASE}/deals/${deal.id}/documents`, {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
         body: fd,
@@ -1558,14 +1559,18 @@ export default function LeadDetailPage() {
   const leadId = params?.id;
 
   const router = useRouter();
-  const { data, error, isLoading, mutate } = useSWR<Lead>(
-    leadId ? `/api/leads/admin/get/${leadId}` : null,
-    fetcher,
-    {
-      refreshInterval: 30000,
-      revalidateOnFocus: true,
-    },
-  );
+  const leadQuery = useLeadDetailQuery(leadId ?? "", {
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+  });
+  const convertLeadMutation = useConvertLeadMutation();
+  const deleteLeadMutation = useDeleteLeadMutation();
+  const data = leadQuery.data as Lead | undefined;
+  const error = leadQuery.error;
+  const isLoading = leadQuery.isLoading;
+  const mutate = async () => {
+    await leadQuery.refetch();
+  };
 
   const [activeTab, setActiveTab] = useState<"profile" | "deals" | "notes">(
     "profile",
@@ -1655,16 +1660,13 @@ export default function LeadDetailPage() {
 
   const [editOpen, setEditOpen] = useState(false);
 
-  const {
-    data: dealsData,
-    error: dealsError,
-    isLoading: dealsLoading,
-    mutate: mutateDeals,
-  } = useSWR<Deal[]>(
-    activeTab === "deals" ? `${BASE}/deals/lead/${params.id}` : null,
-    fetcher,
-    { refreshInterval: 30000, revalidateOnFocus: true },
-  );
+  const dealsQuery = useLeadDealsQuery(String(params.id), activeTab === "deals");
+  const dealsData = dealsQuery.data as Deal[] | undefined;
+  const dealsError = dealsQuery.error;
+  const dealsLoading = dealsQuery.isLoading;
+  const mutateDeals = async () => {
+    await dealsQuery.refetch();
+  };
 
 
 
@@ -1676,17 +1678,14 @@ export default function LeadDetailPage() {
   });
 
 
-  const { data: empResp } = useSWR(EMP_API, fetcher, { refreshInterval: 0 });
-  const employees: EmployeeMeta[] =
-    empResp && Array.isArray(empResp.content)
-      ? empResp.content.map((e: any) => ({
-        employeeId: e.employeeId,
-        name: e.name,
-        designation: e.designationName ?? null,
-        department: e.departmentName ?? null,
-        profileUrl: e.profilePictureUrl ?? null,
-      }))
-      : [];
+  const employeesQuery = useLeadEmployeesQuery({ refetchOnWindowFocus: false, staleTime: 60 * 1000 });
+  const employees: EmployeeMeta[] = (employeesQuery.data ?? []).map((employee) => ({
+    employeeId: employee.employeeId,
+    name: employee.name,
+    designation: employee.designationName ?? null,
+    department: employee.departmentName ?? null,
+    profileUrl: employee.profilePictureUrl ?? null,
+  }));
 
   const [addDealOpen, setAddDealOpen] = useState(false);
 
@@ -1718,11 +1717,7 @@ export default function LeadDetailPage() {
     try {
       const token = localStorage.getItem("accessToken");
       if (!token) throw new Error("No access token.");
-      const res = await fetch(`${BASE}/leads/${params.id}/convert`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(await res.text());
+      await convertLeadMutation.mutateAsync(Number(params.id));
       alert("Converted to client.");
       await mutate();
       router.push("/leads");
@@ -1737,11 +1732,7 @@ export default function LeadDetailPage() {
     try {
       const token = localStorage.getItem("accessToken");
       if (!token) throw new Error("No access token.");
-      const res = await fetch(`${BASE}/leads/${params.id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(await res.text());
+      await deleteLeadMutation.mutateAsync(Number(params.id));
       alert("Deleted.");
       router.push("/leads");
     } catch (err: any) {
@@ -1751,10 +1742,7 @@ export default function LeadDetailPage() {
 
   const handleCreatedDeal = async (created: Deal) => {
     if (mutateDeals) {
-      mutateDeals(
-        (curr: Deal[] | undefined) => (curr ? [created, ...curr] : [created]),
-        false,
-      );
+      await mutateDeals();
     }
   };
 
@@ -2420,7 +2408,8 @@ export default function LeadDetailPage() {
 
                                       if (!res.ok) throw new Error(await res.text());
 
-                                      await mutateDeals(); // refresh deals list
+                                      await mutateDeals();
+                                      await mutate();
                                     } catch (err: any) {
                                       alert("Failed to update stage: " + (err?.message ?? err));
                                     }
@@ -2430,8 +2419,8 @@ export default function LeadDetailPage() {
                                   <option value="Generated">Generated</option>
                                   <option value="Qualified">Qualified</option>
                                   <option value="Proposal">Proposal</option>
-                                  <option value="Win">Win</option>
-                                  <option value="Lost">Lost</option>
+                                  <option value="WIN">Win</option>
+                                  <option value="LOST">Lost</option>
                                 </select>
                               </td>
 

@@ -1,11 +1,11 @@
 "use client";
 
-import useSWR from "swr";
 import { useMemo, useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { Card } from "@/components/ui/card";
+import { useAdminLeadsQuery, useCreateLeadMutation, useDealCategoriesQuery, useLeadEmployeesQuery, useLeadSourcesQuery } from "../api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -302,21 +302,30 @@ function EditModal({ lead, onClose, onSaved }: { lead: Lead; onClose: () => void
 export default function LeadsPage() {
   const router = useRouter();
 
-  const { data: leadsData, error: leadsError, isLoading: leadsLoading, mutate } = useSWR<Lead[]>(
-    `${BASE}/leads`,
-    fetcher,
-    { refreshInterval: 30000, revalidateOnFocus: true }
-  );
+  const leadsQuery = useAdminLeadsQuery({
+    refetchInterval: 30000,
+    refetchOnWindowFocus: true,
+  });
+  const leadsData = leadsQuery.data;
+  const leadsError = leadsQuery.error;
+  const leadsLoading = leadsQuery.isLoading;
+  const mutate = async () => {
+    await leadsQuery.refetch();
+  };
 
   // new state to hold which lead is being edited
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
-  // Use the provided employees endpoint (paged)
-  const { data: employeesData } = useSWR<{ content?: Employee[] }>(`${BASE}/employee/all?page=0&size=2000`, fetcher, {
-    revalidateOnFocus: false,
+  const employeesQuery = useLeadEmployeesQuery({
+    refetchOnWindowFocus: false,
+    staleTime: 60 * 1000,
   });
 
-  const employees = (employeesData && (employeesData as any).content) ? (employeesData as any).content : (employeesData as unknown as Employee[]) || [];
+  const employees = (employeesQuery.data ?? []).map((employee) => ({
+    employeeId: employee.employeeId,
+    name: employee.name,
+    designation: employee.designationName ?? undefined,
+  }));
 
   const [query, setQuery] = useState("");
   const [addModalOpen, setAddModalOpen] = useState(false);
@@ -644,37 +653,19 @@ export function AddLeadModal({
   employees: Employee[];
 }) {
   const defaultPipelines = ["Default Pipeline", "Sales Pipeline", "Enterprise Pipeline" , "Client Success Pipeline" , "Finance Pipeline" , "Marketing Pipeline"];
-  const defaultDealStages = ["Generated", "Qualified", "Proposal", "Win", "Lost"];
+  const defaultDealStages = ["Generated", "Qualified", "Proposal", "WIN", "LOST"];
 
-  // server-backed lists
-  const [dealCategories, setDealCategories] = useState<DealCategoryItem[]>([]);
-  const [leadSources, setLeadSources] = useState<LeadSourceItem[]>([]);
-  const [clientCategories, setClientCategories] = useState<DealCategoryItem[]>([]);
+  const createLeadMutation = useCreateLeadMutation();
+  const dealCategoriesQuery = useDealCategoriesQuery({ staleTime: 60 * 1000, refetchOnWindowFocus: false });
+  const leadSourcesQuery = useLeadSourcesQuery({ staleTime: 60 * 1000, refetchOnWindowFocus: false });
 
-  useEffect(() => {
-    const token = localStorage.getItem("accessToken");
-    if (!token) return;
-    (async () => {
-      try {
-        const res1 = await fetch(`${BASE}/deals/dealCategory`, { headers: { Authorization: `Bearer ${token}` } });
-        if (res1.ok) {
-          const json = await res1.json();
-          if (Array.isArray(json)) {
-            setDealCategories(json);
-            setClientCategories(json);
-          }
-        }
-        const res2 = await fetch(`${BASE}/deals/dealCategory/LeadSource`, { headers: { Authorization: `Bearer ${token}` } });
-        if (res2.ok) {
-          const json2 = await res2.json();
-          if (Array.isArray(json2)) setLeadSources(json2);
-        }
-      } catch {
-        // ignore
-      }
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const dealCategories: DealCategoryItem[] = (dealCategoriesQuery.data ?? [])
+    .map((item) => ({ id: item.id, categoryName: item.categoryName || item.name || "" }))
+    .filter((item) => item.categoryName);
+  const clientCategories: DealCategoryItem[] = dealCategories;
+  const leadSources: LeadSourceItem[] = (leadSourcesQuery.data ?? [])
+    .map((item) => ({ id: item.id, name: item.name || "" }))
+    .filter((item) => item.name);
 
   const emptyDeal: DealPayload = {
     title: "",
@@ -790,9 +781,6 @@ export function AddLeadModal({
     setSubmitting(true);
 
     try {
-      const token = localStorage.getItem("accessToken");
-      if (!token) throw new Error("No access token found.");
-
       const body: any = {
         name: payload.name,
         email: payload.email,
@@ -823,17 +811,7 @@ export function AddLeadModal({
         companyAddress: payload.companyAddress || undefined,
       };
 
-      const res = await fetch(`${BASE}/leads`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        throw new Error(txt || "Failed to create lead");
-      }
-
+      await createLeadMutation.mutateAsync(body);
       onCreated();
       alert("Lead created successfully.");
     } catch (err: any) {
@@ -848,26 +826,14 @@ export function AddLeadModal({
     setAddModalOpen(type);
     setAddName("");
     setLoadingAddList(true);
-    setAddListItems([]);
     try {
-      const token = localStorage.getItem("accessToken");
-      if (!token) throw new Error("No token");
-
       if (type === "leadSource") {
-        const res = await fetch(`${BASE}/deals/dealCategory/LeadSource`, { headers: { Authorization: `Bearer ${token}` } });
-        if (res.ok) {
-          const json = await res.json();
-          if (Array.isArray(json)) setAddListItems(json);
-        }
+        await leadSourcesQuery.refetch();
+        setAddListItems(leadSources);
       } else {
-        const res = await fetch(`${BASE}/deals/dealCategory`, { headers: { Authorization: `Bearer ${token}` } });
-        if (res.ok) {
-          const json = await res.json();
-          if (Array.isArray(json)) setAddListItems(json);
-        }
+        await dealCategoriesQuery.refetch();
+        setAddListItems(type === "clientCategory" ? clientCategories : dealCategories);
       }
-    } catch {
-      // ignore
     } finally {
       setLoadingAddList(false);
     }
@@ -902,12 +868,12 @@ export function AddLeadModal({
       const created = await res.json();
 
       if (type === "leadSource") {
-        setLeadSources((prev) => [{ id: created.id, name: created.name || addName.trim() }, ...prev]);
+        await leadSourcesQuery.refetch();
         setPayload((p) => ({ ...p, leadSource: created.name || addName.trim() }));
       } else {
-        setDealCategories((prev) => [{ id: created.id, categoryName: created.categoryName || addName.trim() }, ...prev]);
-        setClientCategories((prev) => [{ id: created.id, categoryName: created.categoryName || addName.trim() }, ...prev]);
-        setPayload((p) => ({ ...p, deal: { ...(p.deal as DealPayload), dealCategory: created.categoryName || addName.trim() }, clientCategory: created.categoryName || addName.trim() }));
+        await dealCategoriesQuery.refetch();
+        const categoryValue = created.categoryName || created.name || addName.trim();
+        setPayload((p) => ({ ...p, deal: { ...(p.deal as DealPayload), dealCategory: categoryValue }, clientCategory: categoryValue }));
       }
 
       setAddName("");
@@ -939,10 +905,10 @@ export function AddLeadModal({
         throw new Error(txt || "Delete failed");
       }
 
-      if (type === "leadSource") setLeadSources((s) => s.filter((x) => x.id !== id));
-      else {
-        setDealCategories((s) => s.filter((x) => x.id !== id));
-        setClientCategories((s) => s.filter((x) => x.id !== id));
+      if (type === "leadSource") {
+        await leadSourcesQuery.refetch();
+      } else {
+        await dealCategoriesQuery.refetch();
       }
 
       alert("Deleted successfully.");
@@ -976,7 +942,7 @@ export function AddLeadModal({
             <div className="flex gap-2">
               <select className="flex-1 border rounded-md px-3 py-2 text-sm" value={payload.clientCategory} onChange={(e) => update("clientCategory", e.target.value)}>
                 <option value="">--</option>
-                {clientCategories.map((c) => <option key={c.id} value={c.categoryName}>{c.categoryName}</option>)}
+                {clientCategories.map((c) => { const label = c.categoryName || (c as any).name || ""; return <option key={c.id} value={label}>{label}</option>; })}
               </select>
               <button type="button" onClick={() => openAddModal("clientCategory")} className="px-3 py-2 rounded border text-sm">Add</button>
             </div>
@@ -1042,7 +1008,7 @@ export function AddLeadModal({
             <div>
               <label className="block text-xs text-left text-muted-foreground mb-1">Deal Stage *</label>
               <select className="w-full border rounded-md px-3 py-2 text-sm" value={payload.deal!.dealStage} onChange={(e) => updateDeal("dealStage", e.target.value)}>
-                {defaultDealStages.map((s) => <option key={s} value={s}>{s}</option>)}
+                {defaultDealStages.map((s) => <option key={s} value={s}>{s === "WIN" ? "Win" : s === "LOST" ? "Lost" : s}</option>)}
               </select>
             </div>
 
@@ -1064,7 +1030,7 @@ export function AddLeadModal({
               <div className="flex gap-2">
                 <select className="flex-1 border rounded-md px-3 py-2 text-sm" value={payload.deal!.dealCategory} onChange={(e) => updateDeal("dealCategory", e.target.value)}>
                   <option value="">--</option>
-                  {dealCategories.map((d) => <option key={d.id} value={d.categoryName}>{d.categoryName}</option>)}
+                  {dealCategories.map((d) => { const label = d.categoryName || (d as any).name || ""; return <option key={d.id} value={label}>{label}</option>; })}
                 </select>
                 <button type="button" onClick={() => openAddModal("dealCategory")} className="px-3 py-2 rounded border text-sm">Add</button>
               </div>
