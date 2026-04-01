@@ -4,12 +4,13 @@ const API_URL = process.env.NEXT_PUBLIC_MAIN;
 
 export async function GET(request: NextRequest) {
   try {
-    const token = request.headers.get("authorization"); // optional if your external API requires it
+    const token = request.headers.get("authorization");
 
-    const res = await fetch(`${API_URL}/employee?page=0&size=200000`, {
+    const res = await fetch(`${API_URL}/employee/all`, {
       headers: {
         Authorization: token || "",
       },
+      cache: "no-store",
     });
 
     if (!res.ok) {
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest) {
 
     const data = await res.json();
     return NextResponse.json(data);
-  } catch (error: any) {
-    return NextResponse.json({ error: error.message }, { status: 500 });
+  } catch (error) {
+    return NextResponse.json({ error: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 });
   }
 }

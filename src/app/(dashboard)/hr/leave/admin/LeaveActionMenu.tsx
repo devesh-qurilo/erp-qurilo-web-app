@@ -94,7 +94,6 @@
 
 
 "use client";
-"use client";
 
 import { useState, useRef, useEffect } from "react";
 import { createPortal } from "react-dom";

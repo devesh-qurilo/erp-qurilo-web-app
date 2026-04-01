@@ -1,74 +1,26 @@
-// app/hr/leave/[id]/page.tsx
 "use client";
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+
 import Link from "next/link";
+import { useParams } from "next/navigation";
 
-interface Leave {
-  id: number;
-  employeeId: string;
-  employeeName: string;
-  leaveType: string;
-  durationType: string;
-  startDate: string | null;
-  endDate: string | null;
-  singleDate: string | null;
-  reason: string;
-  status: string;
-  rejectionReason: string | null;
-  approvedByName: string | null;
-  isPaid: boolean;
-  approvedAt: string | null;
-  rejectedAt: string | null;
-  documentUrls: string[];
-  createdAt: string;
-  updatedAt: string;
-}
+import { useAdminLeaveDetailQuery } from "../api";
 
-const BASE_URL = process.env.NEXT_PUBLIC_MAIN;
+const formatDate = (date: string) => {
+  return new Date(date).toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
 
 export default function LeaveDetail() {
-  const params = useParams();
-  const id = params.id as string;
-  const [leave, setLeave] = useState<Leave | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const params = useParams<{ id: string }>();
+  const id = params?.id ?? "";
+  const { data: leave, isLoading, error } = useAdminLeaveDetailQuery(id);
 
-  useEffect(() => {
-    const fetchLeave = async () => {
-      try {
-        const token = localStorage.getItem("accessToken");
-        if (!token) {
-          setError("No access token found.");
-          setLoading(false);
-          return;
-        }
-
-        const res = await fetch(`${BASE_URL}/employee/api/leaves/${id}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!res.ok) {
-          throw new Error("Failed to fetch leave details.");
-        }
-
-        const data = await res.json();
-        setLeave(data);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    if (id) {
-      fetchLeave();
-    }
-  }, [id]);
-
-  if (loading) {
+  if (isLoading) {
     return (
-      <div className="flex justify-center items-center h-64">
+      <div className="flex h-64 items-center justify-center">
         <p className="text-gray-500">Loading...</p>
       </div>
     );
@@ -76,29 +28,27 @@ export default function LeaveDetail() {
 
   if (error || !leave) {
     return (
-      <div className="p-6 bg-white rounded-lg shadow-md">
-        <div className="flex justify-center items-center h-64">
-          <p className="text-red-500">{error || "Leave not found."}</p>
+      <div className="rounded-lg bg-white p-6 shadow-md">
+        <div className="flex h-64 items-center justify-center">
+          <p className="text-red-500">{error?.message || "Leave not found."}</p>
         </div>
-        <Link href="/hr/leaves" className="block text-center mt-4 text-blue-600 hover:underline">
-          Back to Leaves List
+        <Link
+          href="/hr/leave/admin"
+          className="mt-4 block text-center text-blue-600 hover:underline"
+        >
+          Back to Leave List
         </Link>
       </div>
     );
   }
 
-  // Get display dates
   const getDisplayDates = () => {
-    if (leave.singleDate) {
-      return leave.singleDate;
-    }
-    if (leave.startDate && leave.endDate) {
-      return `${leave.startDate} to ${leave.endDate}`;
-    }
+    if (leave.singleDate) return formatDate(leave.singleDate);
+    if (leave.startDate && leave.endDate)
+      return `${formatDate(leave.startDate)} to ${formatDate(leave.endDate)}`;
     return "N/A";
   };
 
-  // Get status color class
   const getStatusClass = (status: string) => {
     switch (status) {
       case "APPROVED":
@@ -113,47 +63,61 @@ export default function LeaveDetail() {
   };
 
   return (
-    <div className="p-6 bg-white rounded-lg shadow-md max-w-2xl mx-auto">
-      <div className="flex justify-between items-center mb-6">
+    <div className="mx-auto max-w-2xl rounded-lg bg-white p-6 shadow-md">
+      <div className="mb-6 flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-800">Leave Details</h1>
-        {/* <Link
-          href="/hr/leaves/admin"
-          className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
+        <Link
+          href="/hr/leave/admin"
+          className="rounded-md bg-gray-600 px-4 py-2 text-white transition-colors hover:bg-gray-700"
         >
           Back to List
-        </Link> */}
+        </Link>
       </div>
 
       <div className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
-            <label className="block text-sm font-medium text-gray-500 mb-1">Employee</label>
-            <p className="text-lg font-semibold text-gray-900">{leave.employeeName}</p>
+            <label className="mb-1 block text-sm font-medium text-gray-500">
+              Employee
+            </label>
+            <p className="text-lg font-semibold text-gray-900">
+              {leave.employeeName}
+            </p>
             <p className="text-sm text-gray-500">{leave.employeeId}</p>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-500 mb-1">Leave Type</label>
-            <p className="text-lg font-semibold text-gray-900">{leave.leaveType}</p>
+            <label className="mb-1 block text-sm font-medium text-gray-500">
+              Leave Type
+            </label>
+            <p className="text-lg font-semibold text-gray-900">
+              {leave.leaveType}
+            </p>
             <p className="text-sm text-gray-500">{leave.durationType}</p>
           </div>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-500 mb-1">Dates</label>
+          <label className="mb-1 block text-sm font-medium text-gray-500">
+            Dates
+          </label>
           <p className="text-lg text-gray-900">{getDisplayDates()}</p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-500 mb-1">Reason</label>
-          <p className="text-gray-900">{leave.reason}</p>
+          <label className="mb-1 block text-sm font-medium text-gray-500">
+            Reason
+          </label>
+          <p className="text-gray-900">{leave.reason || "N/A"}</p>
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-500 mb-1">Status</label>
+          <label className="mb-1 block text-sm font-medium text-gray-500">
+            Status
+          </label>
           <span
-            className={`inline-flex px-3 py-1 text-sm font-semibold rounded-full ${getStatusClass(
-              leave.status
+            className={`inline-flex rounded-full px-3 py-1 text-sm font-semibold ${getStatusClass(
+              leave.status,
             )}`}
           >
             {leave.status}
@@ -162,10 +126,14 @@ export default function LeaveDetail() {
 
         {leave.status === "REJECTED" && leave.rejectionReason && (
           <div>
-            <label className="block text-sm font-medium text-gray-500 mb-1">Rejection Reason</label>
+            <label className="mb-1 block text-sm font-medium text-gray-500">
+              Rejection Reason
+            </label>
             <p className="text-red-600">{leave.rejectionReason}</p>
             {leave.rejectedAt && (
-              <p className="text-xs text-gray-500 mt-1">Rejected at: {new Date(leave.rejectedAt).toLocaleString()}</p>
+              <p className="mt-1 text-xs text-gray-500">
+                Rejected at: {new Date(leave.rejectedAt).toLocaleString()}
+              </p>
             )}
           </div>
         )}
@@ -174,18 +142,26 @@ export default function LeaveDetail() {
           <div>
             {leave.approvedByName && (
               <div>
-                <label className="block text-sm font-medium text-gray-500 mb-1">Approved By</label>
+                <label className="mb-1 block text-sm font-medium text-gray-500">
+                  Approved By
+                </label>
                 <p className="text-green-600">{leave.approvedByName}</p>
               </div>
             )}
             {leave.approvedAt && (
               <div>
-                <label className="block text-sm font-medium text-gray-500 mb-1">Approved At</label>
-                <p className="text-xs text-gray-500">{new Date(leave.approvedAt).toLocaleString()}</p>
+                <label className="mb-1 block text-sm font-medium text-gray-500">
+                  Approved At
+                </label>
+                <p className="text-xs text-gray-500">
+                  {new Date(leave.approvedAt).toLocaleString()}
+                </p>
               </div>
             )}
             <div>
-              <label className="block text-sm font-medium text-gray-500 mb-1">Paid</label>
+              <label className="mb-1 block text-sm font-medium text-gray-500">
+                Paid
+              </label>
               <p className={leave.isPaid ? "text-green-600" : "text-red-600"}>
                 {leave.isPaid ? "Yes" : "No"}
               </p>
@@ -195,7 +171,9 @@ export default function LeaveDetail() {
 
         {leave.documentUrls.length > 0 && (
           <div>
-            <label className="block text-sm font-medium text-gray-500 mb-2">Documents</label>
+            <label className="mb-2 block text-sm font-medium text-gray-500">
+              Documents
+            </label>
             <ul className="space-y-1">
               {leave.documentUrls.map((url, index) => (
                 <li key={index}>
@@ -203,7 +181,7 @@ export default function LeaveDetail() {
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-blue-600 hover:underline text-sm"
+                    className="text-sm text-blue-600 hover:underline"
                   >
                     Document {index + 1}
                   </a>
@@ -213,7 +191,7 @@ export default function LeaveDetail() {
           </div>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs text-gray-500">
+        <div className="grid grid-cols-1 gap-4 text-xs text-gray-500 md:grid-cols-2">
           <div>
             <label>Created At</label>
             <p>{new Date(leave.createdAt).toLocaleString()}</p>

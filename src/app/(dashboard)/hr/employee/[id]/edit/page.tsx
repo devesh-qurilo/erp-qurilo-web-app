@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 
 const BASE_URL = process.env.NEXT_PUBLIC_MAIN;
@@ -44,10 +45,6 @@ export default function EditEmployeePage() {
     const [initialLoading, setInitialLoading] = useState(true);
     const [file, setFile] = useState<File | null>(null);
 
-    const [departments, setDepartments] = useState<Department[]>([]);
-    const [designations, setDesignations] = useState<Designation[]>([]);
-    const [employees, setEmployees] = useState<EmployeeLite[]>([]);
-
     const [form, setForm] = useState<any>({
         employeeId: '',
         name: '',
@@ -80,105 +77,104 @@ export default function EditEmployeePage() {
         officeShift: '',
     });
 
-    /* ================= FETCH DROPDOWNS + EMPLOYEE ================= */
-    useEffect(() => {
-        if (!employeeId) return; // ⛔ WAIT FOR PARAM
-
+    const getToken = () => {
         const token = localStorage.getItem('accessToken');
-        if (!token) return;
-
-        const headers = { Authorization: `Bearer ${token}` };
-
-        Promise.all([
-            fetch(`${BASE_URL}/admin/departments`, { headers }).then(r => r.json()),
-            fetch(`${BASE_URL}/admin/designations`, { headers }).then(r => r.json()),
-            fetch(`${BASE_URL}/employee?page=0&size=20000`, { headers })
-                .then(r => r.json())
-                .then(d => d.content),
-        ])
-            .then(([dept, desig, empList]) => {
-                setDepartments(dept);
-                setDesignations(desig);
-
-                setEmployees(
-                    empList.map((e: any) => ({
-                        employeeId: e.employeeId,
-                        name: e.name,
-                    }))
-                );
-
-                const emp = empList.find(
-                    (e: any) => e.employeeId === employeeId
-                );
-
-                if (!emp) {
-                    alert('Employee not found');
-                    setInitialLoading(false); // ✅ STOP LOADER
-                    return;
-                }
-
-                // ✅ PREFILL (WORKS 100%)
-                setForm({
-                    employeeId: emp.employeeId,
-                    name: emp.name ?? '',
-                    email: emp.email ?? '',
-                    password: '',
-                    gender: emp.gender ?? 'Male',
-                    birthday: emp.birthday ?? '',
-                    bloodGroup: emp.bloodGroup ?? '',
-                    joiningDate: emp.joiningDate ?? '',
-                    language: emp.language ?? '',
-                    designationId: emp.designationId?.toString() ?? '',
-                    departmentId: emp.departmentId?.toString() ?? '',
-                    reportingToId: emp.reportingToId ?? '',
-                    role: emp.role ?? 'ROLE_EMPLOYEE',
-                    country: emp.country ?? '',
-                    mobile: emp.mobile ?? '',
-                    address: emp.address ?? '',
-                    about: emp.about ?? '',
-                    loginAllowed: emp.loginAllowed ?? true,
-                    receiveEmailNotification: emp.receiveEmailNotification ?? false,
-                    hourlyRate: emp.hourlyRate?.toString() ?? '',
-                    slackMemberId: emp.slackMemberId ?? '',
-                    skills: emp.skills?.join(', ') ?? '',
-                    probationEndDate: emp.probationEndDate ?? '',
-                    noticePeriodStartDate: emp.noticePeriodStartDate ?? '',
-                    noticePeriodEndDate: emp.noticePeriodEndDate ?? '',
-                    employmentType: emp.employmentType ?? '',
-                    maritalStatus: emp.maritalStatus ?? '',
-                    businessAddress: emp.businessAddress ?? '',
-                    officeShift: emp.officeShift ?? '',
-                });
-
-                setInitialLoading(false);
-            })
-            .catch((err) => {
-                console.error(err);
-                setInitialLoading(false); // ✅ ALWAYS STOP LOADER
-                alert('Failed to load employee data');
-            });
-    }, [employeeId]);
-
-
-
-    /* ================= CHANGE HANDLER ================= */
-    const handleChange = (e: any) => {
-        const { name, value, type, checked } = e.target;
-        setForm((p: any) => ({
-            ...p,
-            [name]: type === 'checkbox' ? checked : value,
-        }));
+        if (!token) throw new Error('No access token found');
+        return token;
     };
 
-    /* ================= UPDATE ================= */
-    const handleSubmit = async (e: any) => {
-        e.preventDefault();
-        setLoading(true);
+    const fetchJson = async <T,>(url: string): Promise<T> => {
+        const res = await fetch(url, {
+            headers: { Authorization: `Bearer ${getToken()}` },
+        });
 
-        try {
-            const token = localStorage.getItem('accessToken');
-            if (!token) throw new Error('No token');
+        if (!res.ok) {
+            throw new Error((await res.text()) || 'Request failed');
+        }
 
+        return res.json() as Promise<T>;
+    };
+
+    const { data: departments = [] } = useQuery({
+        queryKey: ['employee-edit', 'departments'],
+        queryFn: () => fetchJson<Department[]>(`${BASE_URL}/admin/departments`),
+        enabled: Boolean(employeeId),
+    });
+
+    const { data: designations = [] } = useQuery({
+        queryKey: ['employee-edit', 'designations'],
+        queryFn: () => fetchJson<Designation[]>(`${BASE_URL}/admin/designations`),
+        enabled: Boolean(employeeId),
+    });
+
+    const { data: employees = [] } = useQuery<EmployeeLite[]>({
+        queryKey: ['employee-edit', 'employees'],
+        queryFn: async () => {
+            const data = await fetchJson<EmployeeLite[]>(`${BASE_URL}/employee/all`);
+            return data.map((e) => ({
+                employeeId: e.employeeId,
+                name: e.name,
+            }));
+        },
+        enabled: Boolean(employeeId),
+    });
+
+    const employeeQuery = useQuery<Record<string, any>>({
+        queryKey: ['employee-edit', employeeId],
+        queryFn: () => fetchJson<any>(`${BASE_URL}/employee/${employeeId}`),
+        enabled: Boolean(employeeId),
+    });
+
+    useEffect(() => {
+        if (!employeeQuery.data) {
+            return;
+        }
+
+        const emp = employeeQuery.data;
+        setForm({
+            employeeId: emp.employeeId,
+            name: emp.name ?? '',
+            email: emp.email ?? '',
+            password: '',
+            gender: emp.gender ?? 'Male',
+            birthday: emp.birthday ?? '',
+            bloodGroup: emp.bloodGroup ?? '',
+            joiningDate: emp.joiningDate ?? '',
+            language: emp.language ?? '',
+            designationId: emp.designationId?.toString() ?? '',
+            departmentId: emp.departmentId?.toString() ?? '',
+            reportingToId: emp.reportingToId ?? '',
+            role: emp.role ?? 'ROLE_EMPLOYEE',
+            country: emp.country ?? '',
+            mobile: emp.mobile ?? '',
+            address: emp.address ?? '',
+            about: emp.about ?? '',
+            loginAllowed: emp.loginAllowed ?? true,
+            receiveEmailNotification: emp.receiveEmailNotification ?? false,
+            hourlyRate: emp.hourlyRate?.toString() ?? '',
+            slackMemberId: emp.slackMemberId ?? '',
+            skills: emp.skills?.join(', ') ?? '',
+            probationEndDate: emp.probationEndDate ?? '',
+            noticePeriodStartDate: emp.noticePeriodStartDate ?? '',
+            noticePeriodEndDate: emp.noticePeriodEndDate ?? '',
+            employmentType: emp.employmentType ?? '',
+            maritalStatus: emp.maritalStatus ?? '',
+            businessAddress: emp.businessAddress ?? '',
+            officeShift: emp.officeShift ?? '',
+        });
+        setInitialLoading(false);
+    }, [employeeQuery.data]);
+
+    useEffect(() => {
+        if (employeeQuery.isError) {
+            console.error(employeeQuery.error);
+            setInitialLoading(false);
+            alert('Failed to load employee data');
+        }
+    }, [employeeQuery.error, employeeQuery.isError]);
+
+    const updateEmployeeMutation = useMutation({
+        mutationFn: async () => {
             const payload = {
                 ...form,
                 departmentId: Number(form.departmentId),
@@ -195,18 +191,37 @@ export default function EditEmployeePage() {
 
             const res = await fetch(`${BASE_URL}/employee/${employeeId}`, {
                 method: 'PUT',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
+                headers: { Authorization: `Bearer ${getToken()}` },
                 body: fd,
             });
 
-            if (!res.ok) throw new Error('Failed to update employee');
+            if (!res.ok) throw new Error((await res.text()) || 'Failed to update employee');
 
-            await res.json();
+            return res.json();
+        },
+    });
+
+
+
+    /* ================= CHANGE HANDLER ================= */
+    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+        const { name, value, type, checked } = e.target;
+        setForm((p: Record<string, unknown>) => ({
+            ...p,
+            [name]: type === 'checkbox' ? checked : value,
+        }));
+    };
+
+    /* ================= UPDATE ================= */
+    const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        setLoading(true);
+
+        try {
+            await updateEmployeeMutation.mutateAsync();
             router.push('/hr/employee');
-        } catch (err: any) {
-            alert(err.message);
+        } catch (err) {
+            alert(err instanceof Error ? err.message : 'Request failed');
         } finally {
             setLoading(false);
         }

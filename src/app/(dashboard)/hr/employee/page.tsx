@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import Link from "next/link";
 
 import { createPortal } from "react-dom";
@@ -30,6 +31,7 @@ interface Employee {
   profilePictureUrl: string | null;
 
   designationName: string | null;
+  departmentName?: string | null;
 
   reportingToName: string | null;
 
@@ -47,7 +49,7 @@ const BASE_URL = process.env.NEXT_PUBLIC_MAIN;
 
 export default function EmployeePage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [loading, setLoading] = useState(true);
+  const queryClient = useQueryClient();
 
   // filters
   const [search, setSearch] = useState("");
@@ -77,21 +79,101 @@ export default function EmployeePage() {
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-  /* ================= FETCH EMPLOYEES ================= */
+  const getToken = () => {
+    const token = localStorage.getItem("accessToken");
+    if (!token) throw new Error("No access token found");
+    return token;
+  };
+
+  const fetchEmployees = async (): Promise<Employee[]> => {
+    if (!BASE_URL) throw new Error("NEXT_PUBLIC_MAIN is not configured");
+
+    const res = await fetch(`${BASE_URL}/employee/all`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+
+    if (!res.ok) {
+      throw new Error((await res.text()) || "Failed to fetch employees");
+    }
+
+    return res.json();
+  };
+
+  const employeesQuery = useQuery({
+    queryKey: ["employees", "all"],
+    queryFn: fetchEmployees,
+  });
+
   useEffect(() => {
-    const fetchEmployees = async () => {
-      const token = localStorage.getItem("accessToken");
-      const res = await fetch(`${BASE_URL}/employee?page=0&size=20000`, {
-        headers: { Authorization: `Bearer ${token}` },
+    if (employeesQuery.data) {
+      setEmployees(employeesQuery.data);
+    }
+  }, [employeesQuery.data]);
+
+  const loading = employeesQuery.isLoading;
+
+  const inviteMutation = useMutation({
+    mutationFn: async (payload: { to: string; message: string }) => {
+      const res = await fetch(`${BASE_URL}/employee/invite`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify(payload),
       });
-      const data = await res.json();
-      setEmployees(data.content);
-      setLoading(false);
-    };
-    fetchEmployees();
-  }, []);
 
+      if (!res.ok) {
+        throw new Error((await res.text()) || "Failed to send invite");
+      }
 
+      return res.json();
+    },
+  });
+
+  const deleteEmployeeMutation = useMutation({
+    mutationFn: async (employeeId: string) => {
+      const res = await fetch(`${BASE_URL}/employee/${encodeURIComponent(employeeId)}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+
+      if (!res.ok) {
+        throw new Error((await res.text()) || "Failed to delete employee");
+      }
+    },
+    onSuccess: async (_, employeeId) => {
+      setEmployees((prev) => prev.filter((e) => e.employeeId !== employeeId));
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
+    },
+  });
+
+  const updateRoleMutation = useMutation({
+    mutationFn: async ({ employeeId, role }: { employeeId: string; role: string }) => {
+      const response = await fetch(`${BASE_URL}/employee/${employeeId}/role`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getToken()}`,
+        },
+        body: JSON.stringify({ role }),
+      });
+
+      if (!response.ok) {
+        throw new Error((await response.text()) || "Failed to update role");
+      }
+
+      return response.json();
+    },
+    onSuccess: async (_, variables) => {
+      setEmployees((prev) =>
+        prev.map((emp) =>
+          emp.employeeId === variables.employeeId ? { ...emp, role: variables.role } : emp
+        )
+      );
+      await queryClient.invalidateQueries({ queryKey: ["employees"] });
+    },
+  });
 
 
   useEffect(() => {
@@ -166,21 +248,10 @@ export default function EmployeePage() {
 
     setInviteLoading(true);
     try {
-      const token = localStorage.getItem("accessToken");
-
-      const res = await fetch(`${BASE_URL}/employee/invite`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          to: inviteEmail,
-          message: inviteMessage,
-        }),
+      await inviteMutation.mutateAsync({
+        to: inviteEmail,
+        message: inviteMessage,
       });
-
-      if (!res.ok) throw new Error("Failed to send invite");
 
       setInviteOpen(false);
       setInviteEmail("");
@@ -243,17 +314,8 @@ export default function EmployeePage() {
   // if (loading) return <div className="p-6">Loading...</div>;
 
   const deleteEmployee = async (id: string) => {
-    // if (!confirm('Are you sure you want to delete this employee?')) return;
-
     try {
-      //("gggggggkkkk")
-      const token = localStorage.getItem("accessToken");
-      await fetch(`${BASE_URL}/employee/${encodeURIComponent(id)}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      setEmployees((prev) => prev.filter((e) => e.employeeId !== id));
+      await deleteEmployeeMutation.mutateAsync(id);
     } catch {
       alert("Failed to delete employee");
     }
@@ -278,35 +340,7 @@ export default function EmployeePage() {
 
   const handleRoleChange = async (employeeId: string, newRole: string) => {
     try {
-      const token = localStorage.getItem("accessToken");
-
-      const response = await fetch(
-        `${BASE_URL}/employee/${employeeId}/role`,
-        {
-          method: "PATCH", // agar backend PATCH expect karta hai
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            role: newRole,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Failed to update role");
-      }
-
-      // ✅ UI instant update
-      setEmployees((prev) =>
-        prev.map((emp) =>
-          emp.employeeId === employeeId
-            ? { ...emp, role: newRole }
-            : emp
-        )
-      );
-
+      await updateRoleMutation.mutateAsync({ employeeId, role: newRole });
       alert("Role updated successfully");
     } catch (error) {
       console.error(error);
