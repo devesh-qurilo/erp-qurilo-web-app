@@ -1,774 +1,734 @@
-
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Calendar, List, User } from "lucide-react";
-// import { useEffect, useState } from "react";
-import { useEffect, useState, useRef } from "react";
+import { Calendar, List } from "lucide-react";
 import { createPortal } from "react-dom";
-import HolidayCalendar from "./HolidayCalendar";
-
-
+import { useMemo, useRef, useState } from "react";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 
-interface Holiday {
-  id: number;
+import HolidayCalendar from "./HolidayCalendar";
+import {
+  type DefaultWeeklyHolidayRequest,
+  type Holiday,
+  useCreateBulkHolidaysMutation,
+  useCreateDefaultWeeklyHolidaysMutation,
+  useCreateHolidayMutation,
+  useDeleteHolidayMutation,
+  useHolidayListQuery,
+  useToggleHolidayStatusMutation,
+  useUpcomingHolidaysQuery,
+  useUpdateHolidayMutation,
+} from "./api";
+
+interface HolidayDraft {
   date: string;
-  day: string;
   occasion: string;
-  isDefaultWeekly: boolean;
-  isActive: boolean;
 }
 
-const BASE_URL = process.env.NEXT_PUBLIC_MAIN;
+type ViewMode = "list" | "calendar";
+type ModalMode = "single" | "bulk" | "default-weekly";
+
+const weekDayOptions = [
+  "SUNDAY",
+  "MONDAY",
+  "TUESDAY",
+  "WEDNESDAY",
+  "THURSDAY",
+  "FRIDAY",
+  "SATURDAY",
+];
+
+const emptyHolidayDraft = (): HolidayDraft => ({ date: "", occasion: "" });
 
 export default function HolidayPage() {
-  const [holidays, setHolidays] = useState<Holiday[]>([]);
-  const [filteredHolidays, setFilteredHolidays] = useState<Holiday[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-
-  /* filters */
   const [year, setYear] = useState(new Date().getFullYear());
   const [month, setMonth] = useState<number | "">(new Date().getMonth() + 1);
   const [search, setSearch] = useState("");
+  const [viewMode, setViewMode] = useState<ViewMode>("list");
 
-  /* add modal */
-  const [addingHoliday, setAddingHoliday] = useState(false);
-  const [newHolidays, setNewHolidays] = useState([{ date: "", occasion: "" }]);
-
-  /* edit / action */
+  const [modalOpen, setModalOpen] = useState(false);
+  const [modalMode, setModalMode] = useState<ModalMode>("single");
+  const [drafts, setDrafts] = useState<HolidayDraft[]>([emptyHolidayDraft()]);
   const [editingHoliday, setEditingHoliday] = useState<Holiday | null>(null);
+  const [error, setError] = useState("");
+
+  const [defaultWeekly, setDefaultWeekly] =
+    useState<DefaultWeeklyHolidayRequest>({
+      month: new Date().getMonth() + 1,
+      year: new Date().getFullYear(),
+      occasion: "Weekly Holiday",
+      weekDays: ["SUNDAY"],
+    });
+
   const [openActionId, setOpenActionId] = useState<number | null>(null);
-  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [menuPosition, setMenuPosition] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
+  const menuRef = useRef<HTMLDivElement | null>(null);
 
+  const holidaysQuery = useHolidayListQuery();
+  const upcomingQuery = useUpcomingHolidaysQuery();
+  const createHolidayMutation = useCreateHolidayMutation();
+  const createBulkMutation = useCreateBulkHolidaysMutation();
+  const createDefaultWeeklyMutation = useCreateDefaultWeeklyHolidaysMutation();
+  const updateHolidayMutation = useUpdateHolidayMutation();
+  const deleteHolidayMutation = useDeleteHolidayMutation();
+  const toggleHolidayStatusMutation = useToggleHolidayStatusMutation();
 
-  const [isEditMode, setIsEditMode] = useState(false);
-const [editId, setEditId] = useState<number | null>(null);
+  const holidayData = holidaysQuery.data;
+  const loading = holidaysQuery.isLoading;
+  const saving =
+    createHolidayMutation.isPending ||
+    createBulkMutation.isPending ||
+    createDefaultWeeklyMutation.isPending ||
+    updateHolidayMutation.isPending ||
+    deleteHolidayMutation.isPending ||
+    toggleHolidayStatusMutation.isPending;
 
-
-
-const [menuPosition, setMenuPosition] = useState<{
-  top: number;
-  left: number;
-} | null>(null);
-
-const menuRef = useRef<HTMLDivElement | null>(null);
-
-
-  /* ================= FETCH ================= */
-  const fetchHolidays = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem("accessToken");
-      const res = await fetch(`${BASE_URL}/employee/api/holidays`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error("Failed to fetch holidays");
-      setHolidays(await res.json());
-    } catch (err: any) {
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchHolidays();
-  }, []);
-
-  /* ================= FILTER ================= */
-  useEffect(() => {
-    let list = holidays;
+  const filteredHolidays = useMemo(() => {
+    let list = holidayData ?? [];
 
     if (year || month) {
-      list = list.filter((h) => {
-        const [y, m] = h.date.split("-").map(Number);
-        if (year && y !== year) return false;
-        if (month && m !== month) return false;
+      list = list.filter((holiday) => {
+        const [holidayYear, holidayMonth] = holiday.date.split("-").map(Number);
+        if (year && holidayYear !== year) return false;
+        if (month && holidayMonth !== month) return false;
         return true;
       });
     }
 
     if (search.trim()) {
-      list = list.filter((h) =>
-        h.occasion.toLowerCase().includes(search.toLowerCase())
+      list = list.filter(
+        (holiday) =>
+          holiday.occasion.toLowerCase().includes(search.toLowerCase()) ||
+          holiday.day.toLowerCase().includes(search.toLowerCase()),
       );
     }
 
-    setFilteredHolidays(list);
-  }, [holidays, year, month, search]);
+    return list;
+  }, [holidayData, month, search, year]);
 
-  /* ================= ADD ================= */
-  const addRow = () =>
-    setNewHolidays([...newHolidays, { date: "", occasion: "" }]);
-
-  const updateRow = (i: number, k: "date" | "occasion", v: string) => {
-    const copy = [...newHolidays];
-    copy[i][k] = v;
-    setNewHolidays(copy);
+  const closeModal = () => {
+    setModalOpen(false);
+    setModalMode("single");
+    setDrafts([emptyHolidayDraft()]);
+    setEditingHoliday(null);
+    setError("");
   };
 
-  const removeRow = (i: number) =>
-    setNewHolidays(newHolidays.filter((_, idx) => idx !== i));
+  const openCreateModal = (mode: ModalMode) => {
+    setModalMode(mode);
+    setEditingHoliday(null);
+    setDrafts(
+      mode === "bulk"
+        ? [emptyHolidayDraft(), emptyHolidayDraft()]
+        : [emptyHolidayDraft()],
+    );
+    setError("");
+    setModalOpen(true);
+  };
 
-  // const handleAdd = async () => {
-  //   const validHolidays = newHolidays.filter(
-  //     (h) => h.date && h.occasion.trim()
-  //   );
+  const openEditModal = (holiday: Holiday) => {
+    setModalMode("single");
+    setEditingHoliday(holiday);
+    setDrafts([{ date: holiday.date, occasion: holiday.occasion }]);
+    setError("");
+    setModalOpen(true);
+  };
 
-  //   if (!validHolidays.length) {
-  //     setError("At least one holiday is required");
-  //     return;
-  //   }
+  const addDraftRow = () =>
+    setDrafts((current) => [...current, emptyHolidayDraft()]);
+  const removeDraftRow = (index: number) =>
+    setDrafts((current) => current.filter((_, i) => i !== index));
 
-  //   try {
-  //     setSaving(true);
-  //     setError("");
+  const updateDraft = (
+    index: number,
+    key: keyof HolidayDraft,
+    value: string,
+  ) => {
+    setDrafts((current) =>
+      current.map((draft, draftIndex) =>
+        draftIndex === index ? { ...draft, [key]: value } : draft,
+      ),
+    );
+  };
 
-  //     const token = localStorage.getItem("accessToken");
-  //     if (!token) {
-  //       setError("Authentication required");
-  //       return;
-  //     }
-
-  //     const res = await fetch(
-  //       `${process.env.NEXT_PUBLIC_MAIN}/employee/api/holidays/bulk`,
-  //       {
-  //         method: "POST",
-  //         headers: {
-  //           Authorization: `Bearer ${token}`,
-  //           "Content-Type": "application/json",
-  //         },
-  //         body: JSON.stringify({
-  //           holidays: validHolidays, // ✅ EXACT API FORMAT
-  //         }),
-  //       }
-  //     );
-
-  //     if (!res.ok) {
-  //       const text = await res.text();
-  //       throw new Error(text || "Failed to add holidays");
-  //     }
-
-  //     // response is array of created holidays
-  //     await fetchHolidays(); // refresh table
-  //     setAddingHoliday(false);
-  //     setNewHolidays([{ date: "", occasion: "" }]);
-  //   } catch (err: any) {
-  //     setError(err.message);
-  //   } finally {
-  //     setSaving(false);
-  //   }
-  // };
-
-
-
-const handleSave = async () => {
-  const validHolidays = newHolidays.filter(
-    (h) => h.date && h.occasion.trim()
+  const validDrafts = drafts.filter(
+    (draft) => draft.date && draft.occasion.trim(),
   );
 
-  if (!validHolidays.length) {
-    setError("At least one holiday is required");
-    return;
-  }
+  const handleSave = async () => {
+    setError("");
 
-  try {
-    setSaving(true);
-    const token = localStorage.getItem("accessToken");
-
-    if (!token) {
-      setError("Authentication required");
-      return;
-    }
-
-    // ✨ EDIT MODE
-    if (isEditMode && editId) {
-      await fetch(`${BASE_URL}/employee/api/holidays/${editId}`, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(validHolidays[0]),
-      });
-    }
-    // ➕ ADD MODE
-    else {
-      await fetch(`${BASE_URL}/employee/api/holidays/bulk`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ holidays: validHolidays }),
-      });
-    }
-
-    await fetchHolidays();
-
-    // reset
-    setAddingHoliday(false);
-    setIsEditMode(false);
-    setEditId(null);
-    setNewHolidays([{ date: "", occasion: "" }]);
-  } catch (err: any) {
-    setError(err.message);
-  } finally {
-    setSaving(false);
-  }
-};
-
-
-
-  /* ================= UPDATE ================= */
-  const handleUpdate = async () => {
-    if (!editingHoliday) return;
     try {
-      setSaving(true);
-      const token = localStorage.getItem("accessToken");
-
-      await fetch(
-        `${BASE_URL}/employee/api/holidays/${editingHoliday.id}`,
-        {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            date: editingHoliday.date,
-            occasion: editingHoliday.occasion,
-          }),
+      if (editingHoliday) {
+        if (!validDrafts.length) {
+          setError("Date and occasion are required");
+          return;
         }
-      );
 
-      await fetchHolidays();
-      setEditingHoliday(null);
-    } finally {
-      setSaving(false);
+        await updateHolidayMutation.mutateAsync({
+          id: editingHoliday.id,
+          payload: validDrafts[0],
+        });
+        closeModal();
+        return;
+      }
+
+      if (modalMode === "default-weekly") {
+        if (!defaultWeekly.weekDays?.length) {
+          setError("Select at least one weekday");
+          return;
+        }
+        if (!defaultWeekly.month || !defaultWeekly.year) {
+          setError("Month and year are required");
+          return;
+        }
+
+        await createDefaultWeeklyMutation.mutateAsync(defaultWeekly);
+        closeModal();
+        return;
+      }
+
+      if (!validDrafts.length) {
+        setError("At least one holiday is required");
+        return;
+      }
+
+      if (modalMode === "bulk") {
+        await createBulkMutation.mutateAsync(validDrafts);
+      } else {
+        await createHolidayMutation.mutateAsync(validDrafts[0]);
+      }
+
+      closeModal();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Request failed");
     }
   };
 
-  /* ================= DELETE ================= */
   const handleDelete = async (id: number) => {
     if (!confirm("Delete this holiday?")) return;
+
     try {
-      setSaving(true);
-      const token = localStorage.getItem("accessToken");
-      await fetch(`${BASE_URL}/employee/api/holidays/${id}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      await fetchHolidays();
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  useEffect(() => {
-    // reset row-level UI state when switching views
-    setOpenActionId(null);
-    setEditingHoliday(null);
-  }, [viewMode]);
-
-
-
-useEffect(() => {
-  const handleClickOutside = (event: MouseEvent) => {
-    if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+      await deleteHolidayMutation.mutateAsync(id);
       setOpenActionId(null);
       setMenuPosition(null);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to delete holiday");
     }
   };
 
-  const handleEscape = (event: KeyboardEvent) => {
-    if (event.key === "Escape") {
+  const handleToggleStatus = async (id: number) => {
+    try {
+      await toggleHolidayStatusMutation.mutateAsync(id);
       setOpenActionId(null);
       setMenuPosition(null);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to toggle holiday status",
+      );
     }
   };
-
-  if (openActionId !== null) {
-    document.addEventListener("mousedown", handleClickOutside);
-    document.addEventListener("keydown", handleEscape);
-  }
-
-  return () => {
-    document.removeEventListener("mousedown", handleClickOutside);
-    document.removeEventListener("keydown", handleEscape);
+  const formatKey = (date: string) => {
+    return new Date(date).toISOString().slice(0, 10); // YYYY-MM-DD
   };
-}, [openActionId]);
-
-
-
-
-  // if (loading) return <p className="p-6">Loading…</p>;
-
   return (
-    <div className="p-6 max-w-7xl mx-auto bg-white rounded-lg border">
-
-  <div className="flex gap-3 mb-4">
-
-
-      {loading ? (
-    <>
-      <Skeleton width={80} height={35} />
-      <Skeleton width={150} height={35} />
-    </>
-  ) : (
-    <>
-        <input
-          type="number"
-          value={year}
-          onChange={(e) => setYear(+e.target.value)}
-          className="border px-2 py-1 rounded w-24"
-        />
-        <select
-          value={month}
-          onChange={(e) => setMonth(e.target.value ? +e.target.value : "")}
-          className="border px-2 py-1 rounded"
-        >
-          <option value="">All Months</option>
-          {Array.from({ length: 12 }).map((_, i) => (
-            <option key={i} value={i + 1}>
-              {new Date(0, i).toLocaleString("default", { month: "long" })}
-            </option>
-          ))}
-        </select>
-    
-
-    </>
-  )}
+    <div className="max-w-7xl mx-auto rounded-lg border bg-white p-6">
+      <div className="mb-4 flex flex-wrap gap-3">
+        {loading ? (
+          <>
+            <Skeleton width={80} height={35} />
+            <Skeleton width={150} height={35} />
+          </>
+        ) : (
+          <>
+            <input
+              type="number"
+              value={year}
+              onChange={(e) =>
+                setYear(Number(e.target.value) || new Date().getFullYear())
+              }
+              className="w-24 rounded border px-2 py-1"
+            />
+            <select
+              value={month}
+              onChange={(e) =>
+                setMonth(e.target.value ? Number(e.target.value) : "")
+              }
+              className="rounded border px-2 py-1"
+            >
+              <option value="">All Months</option>
+              {Array.from({ length: 12 }).map((_, index) => (
+                <option key={index} value={index + 1}>
+                  {new Date(0, index).toLocaleString("default", {
+                    month: "long",
+                  })}
+                </option>
+              ))}
+            </select>
+          </>
+        )}
       </div>
 
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+        {loading ? (
+          <>
+            <Skeleton width={180} height={35} />
+            <div className="flex gap-2">
+              <Skeleton width={220} height={35} />
+              <Skeleton width={40} height={40} />
+              <Skeleton width={40} height={40} />
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => openCreateModal("single")}
+                className="rounded-md bg-blue-600 px-4 py-2 text-white"
+              >
+                + Add Holiday
+              </button>
+              <button
+                onClick={() => openCreateModal("bulk")}
+                className="rounded-md border px-4 py-2"
+              >
+                + Bulk Holidays
+              </button>
+              <button
+                onClick={() => openCreateModal("default-weekly")}
+                className="rounded-md border px-4 py-2"
+              >
+                + Default Weekly
+              </button>
+            </div>
 
+            <div className="flex gap-2">
+              <div className="relative w-64">
+                <svg
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
+                  width="16"
+                  height="16"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  viewBox="0 0 24 24"
+                >
+                  <circle cx="11" cy="11" r="8" />
+                  <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                </svg>
+                <input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search holiday"
+                  className="w-full rounded border py-1 pl-9 pr-3 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
 
+              <Button
+                size="icon"
+                variant={viewMode === "list" ? "default" : "outline"}
+                onClick={() => setViewMode("list")}
+              >
+                <List className="h-4 w-4" />
+              </Button>
 
-
-
-      {/* HEADER */}
-      <div className="flex justify-between items-center mb-6">
-
-  {loading ? (
-    <>
-      <Skeleton width={140} height={35} />
-      <div className="flex gap-2">
-        <Skeleton width={200} height={35} />
-        <Skeleton width={40} height={40} />
-        <Skeleton width={40} height={40} />
+              <Button
+                size="icon"
+                variant={viewMode === "calendar" ? "default" : "outline"}
+                onClick={() => setViewMode("calendar")}
+              >
+                <Calendar className="h-4 w-4" />
+              </Button>
+            </div>
+          </>
+        )}
       </div>
-    </>
-  ) : (
-    <>
 
-        {/* <h1 className="text-xl font-semibold">Holiday Management</h1> */}
-        <button
-          onClick={() => {
-            setAddingHoliday(true);
-            setNewHolidays([{ date: "", occasion: "" }]);
-          }}
-          className="bg-blue-600 text-white px-4 py-2 rounded-md"
-        >
-          + Add Holiday
-        </button>
+      {error ? <p className="mb-4 text-sm text-red-600">{error}</p> : null}
+      {holidaysQuery.error ? (
+        <p className="mb-4 text-sm text-red-600">
+          {holidaysQuery.error.message}
+        </p>
+      ) : null}
 
-
-
-
-
-        <div className="flex gap-2">
-
-
-
-<div className="relative w-64">
-  {/* search icon */}
-  <svg
-    className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"
-    width="16"
-    height="16"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    viewBox="0 0 24 24"
-  >
-    <circle cx="11" cy="11" r="8" />
-    <line x1="21" y1="21" x2="16.65" y2="16.65" />
-  </svg>
-
-  <input
-    value={search}
-    onChange={(e) => setSearch(e.target.value)}
-    placeholder="Search occasion"
-    className="border pl-9 pr-3 py-1 rounded w-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-  />
-</div>
-
-
-
-          <Button
-            size="icon"
-            variant={viewMode === "list" ? "default" : "outline"}
-            onClick={() => setViewMode("list")}
-            aria-label="List View"
-          >
-            <List className="h-4 w-4" />
-          </Button>
-
-          <Button
-            size="icon"
-            variant={viewMode === "calendar" ? "default" : "outline"}
-            onClick={() => setViewMode("calendar")}
-            aria-label="Calendar View"
-          >
-            <Calendar className="h-4 w-4" />
-          </Button>
+      <div className="mb-6 rounded-lg border bg-gray-50 p-4">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-gray-700">
+            Upcoming Holidays
+          </h2>
+          {upcomingQuery.isFetching ? (
+            <span className="text-xs text-gray-500">Refreshing...</span>
+          ) : null}
         </div>
-
-
-</>
-  )}
+        <div className="flex flex-wrap gap-2">
+          {(upcomingQuery.data ?? []).slice(0, 6).map((holiday) => (
+            <div
+              key={holiday.id}
+              className={`rounded-md px-3 py-2 text-sm ${holiday.isActive ? "bg-white text-gray-800" : "bg-gray-200 text-gray-500 line-through"}`}
+            >
+              <div className="font-medium">{holiday.occasion}</div>
+              <div className="text-xs">{formatKey(holiday.date)}</div>
+            </div>
+          ))}
+          {!upcomingQuery.isLoading &&
+          (upcomingQuery.data ?? []).length === 0 ? (
+            <p className="text-sm text-gray-500">No upcoming holidays found.</p>
+          ) : null}
+        </div>
       </div>
-
-
-
-      {/* FILTERS */}
- 
-
-
-
-
 
       {viewMode === "list" ? (
-        /* ================= LIST VIEW ================= */
-        // <table className="w-full border rounded-lg overflow-hidden">
-        <table className="w-full border  rounded-lg overflow-visible">
-
+        <table className="w-full overflow-visible rounded-lg border">
           <thead className="bg-gray-50">
             <tr>
               <th className="px-4 py-2 text-left">Date</th>
               <th className="px-4 py-2 text-left">Day</th>
               <th className="px-4 py-2 text-left">Occasion</th>
-              <th className="px-4 py-2 text-left">Action </th>
+              <th className="px-4 py-2 text-left">Type</th>
+              <th className="px-4 py-2 text-left">Status</th>
+              <th className="px-4 py-2 text-left">Action</th>
             </tr>
           </thead>
-          {/* <tbody>
-            {filteredHolidays.map((h) => ( */}
-
-<tbody>
-  {loading
-    ? Array.from({ length: 5 }).map((_, i) => (
-        <tr key={i}>
-          <td className="px-4 py-2">
-            <Skeleton width={100} />
-          </td>
-          <td className="px-4 py-2">
-            <Skeleton width={60} />
-          </td>
-          <td className="px-4 py-2">
-            <Skeleton width={150} />
-          </td>
-          <td className="px-4 py-2">
-            <Skeleton width={40} />
-          </td>
-        </tr>
-      ))
-    : filteredHolidays.map((h) => (
-
-
-              <tr key={h.id} className="border-t">
-                <td className="px-4 py-2">
-                  {editingHoliday?.id === h.id ? (
-                    <input
-                      type="date"
-                      value={editingHoliday.date}
-                      onChange={(e) =>
-                        setEditingHoliday({
-                          ...editingHoliday,
-                          date: e.target.value,
-                        })
-                      }
-                      className="border px-2 py-1 rounded w-full"
-                    />
-                  ) : (
-                    h.date
-                  )}
-                </td>
-
-                <td className="px-4 py-2">{h.day}</td>
-                <td className="px-4 py-2">
-                  {editingHoliday?.id === h.id ? (
-                    <input
-                      value={editingHoliday.occasion}
-                      onChange={(e) =>
-                        setEditingHoliday({
-                          ...editingHoliday,
-                          occasion: e.target.value,
-                        })
-                      }
-                      className="border px-2 py-1 rounded w-full"
-                    />
-                  ) : (
-                    h.occasion
-                  )}
-                </td>
-
-                <td className="px-4 py-2 relative">
-                  {editingHoliday?.id === h.id ? (
-                    <div className="flex gap-2">
-                      <button
-                        onClick={handleUpdate}
-                        className="bg-green-600 text-white px-3 py-1 rounded"
+          <tbody>
+            {loading
+              ? Array.from({ length: 6 }).map((_, index) => (
+                  <tr key={index}>
+                    <td className="px-4 py-2">
+                      <Skeleton width={100} />
+                    </td>
+                    <td className="px-4 py-2">
+                      <Skeleton width={70} />
+                    </td>
+                    <td className="px-4 py-2">
+                      <Skeleton width={160} />
+                    </td>
+                    <td className="px-4 py-2">
+                      <Skeleton width={90} />
+                    </td>
+                    <td className="px-4 py-2">
+                      <Skeleton width={90} />
+                    </td>
+                    <td className="px-4 py-2">
+                      <Skeleton width={30} />
+                    </td>
+                  </tr>
+                ))
+              : filteredHolidays.map((holiday) => (
+                  <tr key={holiday.id} className="border-t">
+                    <td className="px-4 py-2">{formatKey(holiday.date)}</td>
+                    <td className="px-4 py-2">{holiday.day}</td>
+                    <td className="px-4 py-2">{holiday.occasion}</td>
+                    <td className="px-4 py-2">
+                      <span
+                        className={`rounded-full px-2 py-1 text-xs ${holiday.isDefaultWeekly ? "bg-purple-100 text-purple-700" : "bg-blue-100 text-blue-700"}`}
                       >
-                        Save
-                      </button>
+                        {holiday.isDefaultWeekly ? "Default Weekly" : "Manual"}
+                      </span>
+                    </td>
+                    <td className="px-4 py-2">
                       <button
-                        onClick={() => setEditingHoliday(null)}
-                        className="bg-gray-300 px-3 py-1 rounded"
+                        type="button"
+                        disabled={saving}
+                        onClick={() => void handleToggleStatus(holiday.id)}
+                        className={`rounded-full px-2 py-1 text-xs ${holiday.isActive ? "bg-green-100 text-green-700" : "bg-gray-200 text-gray-600"}`}
                       >
-                        Cancel
+                        {holiday.isActive ? "Active" : "Inactive"}
                       </button>
-                    </div>
-                  ) : (
-                    <>
-                    
-{/* 
-<button
-  type="button"
-  onClick={() =>
-    setOpenActionId(openActionId === h.id ? null : h.id)
-  }
-  className="px-2 py-1 cursor-pointer z-30"
->
-  ⋮
-</button> */}
+                    </td>
+                    <td className="relative px-4 py-2">
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          if (openActionId === holiday.id) {
+                            setOpenActionId(null);
+                            setMenuPosition(null);
+                            return;
+                          }
+                          const rect = (
+                            event.currentTarget as HTMLElement
+                          ).getBoundingClientRect();
+                          const menuWidth = 180;
+                          const menuHeight = 132;
+                          let left = rect.right - menuWidth;
+                          let top = rect.bottom + 6;
+                          if (left + menuWidth > window.innerWidth)
+                            left = window.innerWidth - menuWidth - 10;
+                          if (top + menuHeight > window.innerHeight)
+                            top = rect.top - menuHeight - 6;
+                          setOpenActionId(holiday.id);
+                          setMenuPosition({ top, left });
+                        }}
+                        className="cursor-pointer px-2 py-1"
+                      >
+                        ⋮
+                      </button>
 
-
-
-<button
-  type="button"
-  onClick={(e) => {
-    e.stopPropagation();
-
-    if (openActionId === h.id) {
-      setOpenActionId(null);
-      setMenuPosition(null);
-      return;
-    }
-
-    const rect =
-      (e.currentTarget as HTMLElement).getBoundingClientRect();
-
-    const menuWidth = 160;
-    const menuHeight = 100;
-
-    let left = rect.right - menuWidth;
-    let top = rect.bottom + 6;
-
-    if (left + menuWidth > window.innerWidth) {
-      left = window.innerWidth - menuWidth - 10;
-    }
-
-    if (top + menuHeight > window.innerHeight) {
-      top = rect.top - menuHeight - 6;
-    }
-
-    setOpenActionId(h.id);
-    setMenuPosition({ top, left });
-  }}
-  className="px-2 py-1 cursor-pointer"
->
-  ⋮
-</button>
-
-
-
-                      {/* {openActionId === h.id && (
-                        // <div className="absolute right-0 mt-2 w-32 bg-white border rounded shadow z-20">
-                        <div className="absolute right-0 mt-2 w-32 bg-white border rounded shadow z-50">
-
-                         
-
-
-<button
-  onClick={() => {
-    setIsEditMode(true);
-    setEditId(h.id);
-    setAddingHoliday(true);
-
-    // 👇 modal ko prefill karo
-    setNewHolidays([
-      {
-        date: h.date,
-        occasion: h.occasion,
-      },
-    ]);
-
-    setOpenActionId(null);
-  }}
-  className="block w-full text-left px-3 py-2 hover:bg-gray-100"
->
-  Edit 
-</button>
-
-
-                          <button
-                            onClick={() => {
-                              handleDelete(h.id);
-                              setOpenActionId(null);
-                            }}
-                            className="block w-full text-left px-3 py-2 text-red-600 hover:bg-red-50"
-                          >
-                            Delete
-                          </button>
-                        </div>
-                      )} */}
-
-
-
-
-{openActionId === h.id &&
-  menuPosition &&
-  createPortal(
-    <div
-      ref={menuRef}
-      className="fixed w-36 bg-white border rounded-md shadow-2xl z-[99999]"
-      style={{
-        top: menuPosition.top,
-        left: menuPosition.left,
-      }}
-    >
-      <button
-        onClick={() => {
-          setIsEditMode(true);
-          setEditId(h.id);
-          setAddingHoliday(true);
-          setNewHolidays([
-            { date: h.date, occasion: h.occasion },
-          ]);
-          setOpenActionId(null);
-          setMenuPosition(null);
-        }}
-        className="block w-full text-left px-3 py-2 hover:bg-gray-100 text-sm"
-      >
-        Edit
-      </button>
-
-      <button
-        onClick={() => {
-          handleDelete(h.id);
-          setOpenActionId(null);
-          setMenuPosition(null);
-        }}
-        className="block w-full text-left px-3 py-2 text-red-600 hover:bg-red-50 text-sm"
-      >
-        Delete
-      </button>
-    </div>,
-    document.body
-  )}
-
-
-
-                    </>
-                  )}
-                </td>
-
-              </tr>
-            ))}
+                      {openActionId === holiday.id && menuPosition
+                        ? createPortal(
+                            <div
+                              ref={menuRef}
+                              className="fixed z-[99999] w-44 rounded-md border bg-white shadow-2xl"
+                              style={{
+                                top: menuPosition.top,
+                                left: menuPosition.left,
+                              }}
+                            >
+                              <button
+                                onClick={() => {
+                                  openEditModal(holiday);
+                                  setOpenActionId(null);
+                                  setMenuPosition(null);
+                                }}
+                                className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-100"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                onClick={() =>
+                                  void handleToggleStatus(holiday.id)
+                                }
+                                className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-100"
+                              >
+                                {holiday.isActive
+                                  ? "Mark Inactive"
+                                  : "Mark Active"}
+                              </button>
+                              <button
+                                onClick={() => void handleDelete(holiday.id)}
+                                className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50"
+                              >
+                                Delete
+                              </button>
+                            </div>,
+                            document.body,
+                          )
+                        : null}
+                    </td>
+                  </tr>
+                ))}
           </tbody>
-
-
-
-
         </table>
       ) : (
-        /* ================= CALENDAR VIEW ================= */
-
-
-
-        
-        <HolidayCalendar holidays={filteredHolidays} year={year} month={month || new Date().getMonth() + 1} />
+        <HolidayCalendar
+          holidays={filteredHolidays}
+          year={year}
+          month={month || new Date().getMonth() + 1}
+        />
       )}
 
-
-      {/* ADD MODAL */}
-      {addingHoliday && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-          <div className="bg-white w-full max-w-3xl rounded-lg shadow-lg">
-            <div className="flex justify-between items-center p-4 border-b">
-              {/* <h2 className="font-semibold">Add Holidays</h2> */}
-              <h2 className="font-semibold">
-  {isEditMode ? "Edit Holiday" : "Add Holidays"}
-</h2>
-
-              <button onClick={() => setAddingHoliday(false)}>✕</button>
-            </div>
-
-            <div className="p-6 space-y-4">
-              {newHolidays.map((h, i) => (
-                <div key={i} className="grid grid-cols-5 gap-3">
-                  <input
-                    type="date"
-                    value={h.date}
-                    onChange={(e) => updateRow(i, "date", e.target.value)}
-                    className="border px-2 py-1 rounded col-span-2"
-                  />
-                  <input
-                    value={h.occasion}
-                    onChange={(e) =>
-                      updateRow(i, "occasion", e.target.value)
-                    }
-                    className="border px-2 py-1 rounded col-span-2"
-                    placeholder="Occasion"
-                  />
-                  {newHolidays.length > 1 && (
-                    <button
-                      onClick={() => removeRow(i)}
-                      className="bg-red-500 text-white rounded"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              ))}
-              <button onClick={addRow} className="text-blue-600">
-                + Add Row
+      {modalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="w-full max-w-3xl rounded-lg bg-white shadow-lg">
+            <div className="flex items-center justify-between border-b p-4">
+              <div>
+                <h2 className="font-semibold">
+                  {editingHoliday
+                    ? "Edit Holiday"
+                    : modalMode === "bulk"
+                      ? "Add Holidays In Bulk"
+                      : modalMode === "default-weekly"
+                        ? "Generate Default Weekly Holidays"
+                        : "Add Holiday"}
+                </h2>
+                <p className="text-sm text-gray-500">
+                  {editingHoliday
+                    ? "Update a holiday entry."
+                    : modalMode === "default-weekly"
+                      ? "Create recurring weekly holidays for a month."
+                      : "Create holiday records that match the employee-service API."}
+                </p>
+              </div>
+              <button type="button" onClick={closeModal}>
+                ✕
               </button>
             </div>
 
-            <div className="flex justify-end gap-3 p-4 border-t">
+            <div className="space-y-4 p-6">
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalMode("single");
+                    setEditingHoliday(null);
+                    setDrafts([emptyHolidayDraft()]);
+                  }}
+                  className={`rounded-md px-3 py-2 text-sm ${modalMode === "single" && !editingHoliday ? "bg-blue-600 text-white" : "border"}`}
+                >
+                  Single
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalMode("bulk");
+                    setEditingHoliday(null);
+                    setDrafts([emptyHolidayDraft(), emptyHolidayDraft()]);
+                  }}
+                  className={`rounded-md px-3 py-2 text-sm ${modalMode === "bulk" ? "bg-blue-600 text-white" : "border"}`}
+                >
+                  Bulk
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setModalMode("default-weekly");
+                    setEditingHoliday(null);
+                  }}
+                  className={`rounded-md px-3 py-2 text-sm ${modalMode === "default-weekly" ? "bg-blue-600 text-white" : "border"}`}
+                >
+                  Default Weekly
+                </button>
+              </div>
+
+              {modalMode === "default-weekly" && !editingHoliday ? (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-3 gap-3">
+                    <input
+                      type="number"
+                      value={defaultWeekly.year ?? ""}
+                      onChange={(e) =>
+                        setDefaultWeekly((current) => ({
+                          ...current,
+                          year: Number(e.target.value) || null,
+                        }))
+                      }
+                      className="rounded border px-3 py-2"
+                      placeholder="Year"
+                    />
+                    <select
+                      value={defaultWeekly.month ?? ""}
+                      onChange={(e) =>
+                        setDefaultWeekly((current) => ({
+                          ...current,
+                          month: Number(e.target.value) || null,
+                        }))
+                      }
+                      className="rounded border px-3 py-2"
+                    >
+                      {Array.from({ length: 12 }).map((_, index) => (
+                        <option key={index} value={index + 1}>
+                          {new Date(0, index).toLocaleString("default", {
+                            month: "long",
+                          })}
+                        </option>
+                      ))}
+                    </select>
+                    <input
+                      value={defaultWeekly.occasion ?? ""}
+                      onChange={(e) =>
+                        setDefaultWeekly((current) => ({
+                          ...current,
+                          occasion: e.target.value,
+                        }))
+                      }
+                      className="rounded border px-3 py-2"
+                      placeholder="Occasion"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+                    {weekDayOptions.map((weekDay) => {
+                      const checked = defaultWeekly.weekDays?.includes(weekDay);
+                      return (
+                        <label
+                          key={weekDay}
+                          className="flex items-center gap-2 rounded border px-3 py-2 text-sm"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => {
+                              setDefaultWeekly((current) => {
+                                const next = new Set(current.weekDays ?? []);
+                                if (checked) {
+                                  next.delete(weekDay);
+                                } else {
+                                  next.add(weekDay);
+                                }
+                                return {
+                                  ...current,
+                                  weekDays: Array.from(next),
+                                };
+                              });
+                            }}
+                          />
+                          {weekDay.charAt(0) + weekDay.slice(1).toLowerCase()}
+                        </label>
+                      );
+                    })}
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {drafts.map((draft, index) => (
+                    <div key={index} className="grid grid-cols-5 gap-3">
+                      <input
+                        type="date"
+                        value={draft.date}
+                        onChange={(e) =>
+                          updateDraft(index, "date", e.target.value)
+                        }
+                        className="col-span-2 rounded border px-3 py-2"
+                      />
+                      <input
+                        value={draft.occasion}
+                        onChange={(e) =>
+                          updateDraft(index, "occasion", e.target.value)
+                        }
+                        className="col-span-2 rounded border px-3 py-2"
+                        placeholder="Occasion"
+                      />
+                      {drafts.length > 1 ? (
+                        <button
+                          type="button"
+                          onClick={() => removeDraftRow(index)}
+                          className="rounded bg-red-500 text-white"
+                        >
+                          ✕
+                        </button>
+                      ) : null}
+                    </div>
+                  ))}
+
+                  {!editingHoliday && modalMode === "bulk" ? (
+                    <button
+                      type="button"
+                      onClick={addDraftRow}
+                      className="text-blue-600"
+                    >
+                      + Add Row
+                    </button>
+                  ) : null}
+                </div>
+              )}
+
+              {error ? <p className="text-sm text-red-600">{error}</p> : null}
+            </div>
+
+            <div className="flex justify-end gap-3 border-t p-4">
               <button
-                onClick={() => setAddingHoliday(false)}
-                className="px-4 py-2 bg-gray-200 rounded"
+                type="button"
+                onClick={closeModal}
+                className="rounded bg-gray-200 px-4 py-2"
               >
                 Cancel
               </button>
-              {/* <button
-                onClick={handleAdd}
-                className="px-4 py-2 bg-blue-600 text-white rounded"
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void handleSave()}
+                className="rounded bg-blue-600 px-4 py-2 text-white"
               >
-                Save
-              </button> */}
-
-<button
-  onClick={handleSave}
-  className="px-4 py-2 bg-blue-600 text-white rounded"
->
-  {isEditMode ? "Update" : "Save"}
-</button>
-
-
+                {saving ? "Saving..." : editingHoliday ? "Update" : "Save"}
+              </button>
             </div>
           </div>
         </div>
-      )}
+      ) : null}
     </div>
   );
 }
-
-
-

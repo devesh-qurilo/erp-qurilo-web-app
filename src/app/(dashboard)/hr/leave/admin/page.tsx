@@ -87,10 +87,16 @@ export default function LeavesList() {
 
   const calendarMap = useMemo(() => {
     const map: Record<string, Leave[]> = {};
+    const formatKey = (date: string) => {
+      return new Date(date).toISOString().slice(0, 10); // YYYY-MM-DD
+    };
 
     filteredLeaves.forEach((leave) => {
       if (leave.singleDate) {
-        map[leave.singleDate] = [...(map[leave.singleDate] || []), leave];
+        map[formatKey(leave.singleDate)] = [
+          ...(map[formatKey(leave.singleDate)] || []),
+          leave,
+        ];
         return;
       }
 

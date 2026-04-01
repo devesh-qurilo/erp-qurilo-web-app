@@ -1,120 +1,99 @@
-"use client";
+"use client"
 
-import axios from "axios";
-import { useState } from "react";
+import { useRouter } from "next/navigation"
+import { useState } from "react"
+
+import { useCreateBulkHolidaysMutation } from "../api"
 
 interface NewHoliday {
-  date: string;
-  occasion: string;
+  date: string
+  occasion: string
 }
 
+const emptyHoliday = (): NewHoliday => ({ date: "", occasion: "" })
+
 export default function AddHolidayPage() {
-  const [newHolidays, setNewHolidays] = useState<NewHoliday[]>([
-    { date: "", occasion: "" },
-  ]);
-  const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState("");
+  const router = useRouter()
+  const [newHolidays, setNewHolidays] = useState<NewHoliday[]>([emptyHoliday()])
+  const [message, setMessage] = useState("")
 
-  // Handle holiday input change
+  const createBulkMutation = useCreateBulkHolidaysMutation({
+    onSuccess: () => {
+      setMessage("Holidays created successfully")
+      setNewHolidays([emptyHoliday()])
+      router.push("/hr/holiday")
+    },
+  })
+
   const handleHolidayChange = (index: number, field: keyof NewHoliday, value: string) => {
-    const updated = [...newHolidays];
-    updated[index][field] = value;
-    setNewHolidays(updated);
-  };
+    setNewHolidays((current) =>
+      current.map((holiday, holidayIndex) =>
+        holidayIndex === index ? { ...holiday, [field]: value } : holiday
+      )
+    )
+  }
 
-  // Add new row
-  const addHolidayRow = () => {
-    setNewHolidays([...newHolidays, { date: "", occasion: "" }]);
-  };
+  const addHolidayRow = () => setNewHolidays((current) => [...current, emptyHoliday()])
+  const removeHolidayRow = (index: number) => setNewHolidays((current) => current.filter((_, i) => i !== index))
 
-  // Remove row
-  const removeHolidayRow = (index: number) => {
-    setNewHolidays(newHolidays.filter((_, i) => i !== index));
-  };
-
-  // Submit holidays
   const handleSubmit = async () => {
-    try {
-      // setSubmitting(true);
-      // setMessage("");
+    setMessage("")
+    const validHolidays = newHolidays.filter((holiday) => holiday.date && holiday.occasion.trim())
 
-      const token = localStorage.getItem("accessToken")
-      // if (!token) {
-      //   setMessage("❌ No token found in localStorage");
-      //   setSubmitting(false);
-      //   return;
-      // }
-      //("dekh bhaiiii", JSON.stringify({ holidays: newHolidays }))
-      const res = await axios.post(`${process.env.NEXT_PUBLIC_MAIN}/employee/api/holidays/bulk`, {
-
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ holidays: newHolidays }),
-      });
-
-      if (!res.ok) {
-        throw new Error("Failed to create holidays");
-      }
-
-      await res.data;
-      setMessage("✅ Holidays created successfully!");
-      setNewHolidays([{ date: "", occasion: "" }]);
-    } catch (err: any) {
-      setMessage(`❌ ${err.message}`);
-    } finally {
-      setSubmitting(false);
+    if (!validHolidays.length) {
+      setMessage("At least one holiday is required")
+      return
     }
-  };
+
+    try {
+      await createBulkMutation.mutateAsync(validHolidays)
+    } catch (err) {
+      setMessage(err instanceof Error ? err.message : "Failed to create holidays")
+    }
+  }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <h1 className="text-xl font-bold mb-4">Add New Holidays</h1>
+    <div className="max-w-2xl mx-auto p-6">
+      <h1 className="mb-4 text-xl font-bold">Add New Holidays</h1>
 
       {newHolidays.map((holiday, index) => (
-        <div key={index} className="flex gap-2 mb-2">
+        <div key={index} className="mb-2 flex gap-2">
           <input
             type="date"
             value={holiday.date}
             onChange={(e) => handleHolidayChange(index, "date", e.target.value)}
-            className="border p-2 rounded"
+            className="rounded border p-2"
           />
           <input
             type="text"
             value={holiday.occasion}
             onChange={(e) => handleHolidayChange(index, "occasion", e.target.value)}
             placeholder="Occasion"
-            className="border p-2 rounded flex-1"
+            className="flex-1 rounded border p-2"
           />
-          {newHolidays.length > 1 && (
-            <button
-              onClick={() => removeHolidayRow(index)}
-              className="bg-red-500 text-white px-3 rounded"
-            >
+          {newHolidays.length > 1 ? (
+            <button type="button" onClick={() => removeHolidayRow(index)} className="rounded bg-red-500 px-3 text-white">
               ✕
             </button>
-          )}
+          ) : null}
         </div>
       ))}
 
-      <div className="flex gap-2 mt-4">
-        <button
-          onClick={addHolidayRow}
-          className="bg-green-500 text-white px-4 py-2 rounded"
-        >
+      <div className="mt-4 flex gap-2">
+        <button type="button" onClick={addHolidayRow} className="rounded bg-green-500 px-4 py-2 text-white">
           + Add Row
         </button>
         <button
-          onClick={handleSubmit}
-          disabled={submitting}
-          className="bg-blue-600 text-white px-4 py-2 rounded"
+          type="button"
+          onClick={() => void handleSubmit()}
+          disabled={createBulkMutation.isPending}
+          className="rounded bg-blue-600 px-4 py-2 text-white"
         >
-          {submitting ? "Submitting..." : "Submit"}
+          {createBulkMutation.isPending ? "Submitting..." : "Submit"}
         </button>
       </div>
 
-      {message && <p className="mt-4 text-sm">{message}</p>}
+      {message ? <p className="mt-4 text-sm">{message}</p> : null}
     </div>
-  );
+  )
 }
