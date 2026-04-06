@@ -8,8 +8,10 @@ interface DealTagsProps {
   dealId: string
 }
 
+type TagRecord = { id?: number; tagName?: string } | string
+
 export default function DealTags({ dealId }: DealTagsProps) {
-  const [tags, setTags] = useState<string[]>([])
+  const [tags, setTags] = useState<TagRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -31,7 +33,7 @@ export default function DealTags({ dealId }: DealTagsProps) {
       return
     }
     try {
-      const res = await fetch(`/api/deals/get/${dealId}/tags`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_MAIN}/deals/${dealId}/tags`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -39,8 +41,8 @@ export default function DealTags({ dealId }: DealTagsProps) {
       })
       if (!res.ok) throw new Error(`Failed to fetch tags: ${res.statusText}`)
       const data = await res.json()
-      if (!Array.isArray(data.data)) throw new Error("Invalid data format")
-      setTags(data.data)
+      if (!Array.isArray(data)) throw new Error("Invalid data format")
+      setTags(data)
       setError(null)
     } catch (err: any) {
       console.error(err)
@@ -62,7 +64,7 @@ export default function DealTags({ dealId }: DealTagsProps) {
     setAdding(true)
     setAddError(null)
     try {
-      const res = await fetch(`/api/deals/get/${dealId}/tags`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_MAIN}/deals/${dealId}/tags`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${token}`,
@@ -74,8 +76,8 @@ export default function DealTags({ dealId }: DealTagsProps) {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.error || "Failed to add tag")
       }
-      const { data } = await res.json()
-      setTags(data)
+      const data = await res.json()
+      setTags(Array.isArray(data) ? data : [])
       setNewTag("")
     } catch (err: any) {
       setAddError(err.message || "Could not add tag")
@@ -85,25 +87,35 @@ export default function DealTags({ dealId }: DealTagsProps) {
   }
 
   // -----------------------------------------------------------------
-  const handleDeleteTag = async (tag: string) => {
-    if (!tag) return
-    setDeletingTag(tag)
+  const handleDeleteTag = async (tag: TagRecord) => {
+    const tagName = typeof tag === "string" ? tag : tag.tagName || ""
+    const tagId = typeof tag === "string" ? undefined : tag.id
+    if (!tagName) return
+    setDeletingTag(tagName)
     setDeleteError(null)
     try {
-      const res = await fetch(`/api/deals/get/${dealId}/tags`, {
+      const endpoint = tagId
+        ? `${process.env.NEXT_PUBLIC_MAIN}/deals/${dealId}/tags/${tagId}`
+        : `${process.env.NEXT_PUBLIC_MAIN}/deals/${dealId}/tags`
+      const res = await fetch(endpoint, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ tagName: tag }),
+        ...(tagId ? {} : { body: JSON.stringify({ tagName }) }),
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         throw new Error(err.error || "Failed to delete tag")
       }
-      const { data } = await res.json()
-      setTags(data)
+      const data = tagId ? tags.filter((entry) => (typeof entry === "string" ? entry : entry.id) !== tagId) : await fetch(`${process.env.NEXT_PUBLIC_MAIN}/deals/${dealId}/tags`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }).then((r) => r.json())
+      setTags(Array.isArray(data) ? data : [])
     } catch (err: any) {
       setDeleteError(err.message || "Could not delete tag")
     } finally {
@@ -129,26 +141,29 @@ export default function DealTags({ dealId }: DealTagsProps) {
 
       {/* Tag list */}
       <div className="flex flex-wrap gap-2 mb-4">
-        {tags.map((tag, i) => (
-          <span
-            key={`${tag}-${i}`}
-            className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium"
-          >
-            <span>{tag}</span>
-            {isLoggedIn && (
-              <button
-                type="button"
-                aria-label={`Remove ${tag}`}
-                onClick={() => handleDeleteTag(tag)}
-                disabled={deletingTag === tag}
-                className="rounded-md px-1.5 py-0.5 bg-blue-200 text-blue-900 hover:bg-blue-300 disabled:opacity-50"
-                title="Remove tag"
-              >
-                {deletingTag === tag ? "…" : "×"}
-              </button>
-            )}
-          </span>
-        ))}
+        {tags.map((tag, i) => {
+          const tagName = typeof tag === "string" ? tag : tag.tagName || "Unnamed"
+          return (
+            <span
+              key={`${tagName}-${i}`}
+              className="inline-flex items-center gap-2 px-3 py-1 bg-blue-100 text-blue-800 rounded-full text-sm font-medium"
+            >
+              <span>{tagName}</span>
+              {isLoggedIn && (
+                <button
+                  type="button"
+                  aria-label={`Remove ${tagName}`}
+                  onClick={() => handleDeleteTag(tag)}
+                  disabled={deletingTag === tagName}
+                  className="rounded-md px-1.5 py-0.5 bg-blue-200 text-blue-900 hover:bg-blue-300 disabled:opacity-50"
+                  title="Remove tag"
+                >
+                  {deletingTag === tagName ? "…" : "×"}
+                </button>
+              )}
+            </span>
+          )
+        })}
         {!tags.length && <span className="text-gray-400 italic">No tags yet</span>}
       </div>
 

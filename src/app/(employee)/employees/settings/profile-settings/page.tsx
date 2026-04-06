@@ -1,4 +1,3 @@
-
 // src/app/settings/profile/ProfileForm.tsx
 "use client";
 
@@ -17,9 +16,15 @@ import {
   Plus,
   MoreHorizontal,
   Trash2,
-  Download
+  Download,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -99,7 +104,9 @@ export default function ProfileForm() {
   const [preview, setPreview] = useState<string>("");
 
   // Emergency contacts state
-  const [emergencyContacts, setEmergencyContacts] = useState<EmergencyContact[]>([]);
+  const [emergencyContacts, setEmergencyContacts] = useState<
+    EmergencyContact[]
+  >([]);
   const [showNewContactForm, setShowNewContactForm] = useState<boolean>(false);
   const [newContact, setNewContact] = useState<EmergencyContact>({
     name: "",
@@ -129,7 +136,10 @@ export default function ProfileForm() {
       try {
         const token = localStorage.getItem("accessToken") || "";
         const res = await fetch(`${API_BASE}/employee/me`, {
-          headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+          },
         });
         if (!res.ok) {
           console.warn("Failed to load profile", res.status);
@@ -156,17 +166,24 @@ export default function ProfileForm() {
         });
         if (data.profilePictureUrl) setPreview(data.profilePictureUrl);
 
-        const tokenHeader = { Authorization: `Bearer ${token}`, Accept: "application/json" };
+        const tokenHeader = {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/json",
+        };
 
         // emergency contacts
         if (data.employeeId) {
           try {
-            const cRes = await fetch(`${API_BASE}/employee/${encodeURIComponent(data.employeeId)}/emergency-contacts`, {
-              headers: tokenHeader,
-            });
+            const cRes = await fetch(
+              `${API_BASE}/employee/${encodeURIComponent(data.employeeId)}/emergency-contacts`,
+              {
+                headers: tokenHeader,
+              },
+            );
             if (cRes.ok) {
               const contacts = await cRes.json();
-              if (mounted && Array.isArray(contacts)) setEmergencyContacts(contacts);
+              if (mounted && Array.isArray(contacts))
+                setEmergencyContacts(contacts);
             } else {
               console.warn("Failed to load emergency contacts", cRes.status);
             }
@@ -176,9 +193,12 @@ export default function ProfileForm() {
 
           // documents
           try {
-            const dRes = await fetch(`${API_BASE}/employee/${encodeURIComponent(data.employeeId)}/documents`, {
-              headers: tokenHeader,
-            });
+            const dRes = await fetch(
+              `${API_BASE}/employee/${encodeURIComponent(data.employeeId)}/documents`,
+              {
+                headers: tokenHeader,
+              },
+            );
             if (dRes.ok) {
               const docs = await dRes.json();
               if (mounted && Array.isArray(docs)) setDocuments(docs);
@@ -357,7 +377,13 @@ export default function ProfileForm() {
       }
 
       setEmergencyContacts((prev) => [...prev, json]);
-      setNewContact({ name: "", email: "", mobile: "", address: "", relationship: "" });
+      setNewContact({
+        name: "",
+        email: "",
+        mobile: "",
+        address: "",
+        relationship: "",
+      });
       setShowNewContactForm(false);
     } catch (err) {
       console.error("Unexpected add contact error:", err);
@@ -370,7 +396,9 @@ export default function ProfileForm() {
   // Documents handlers
   const onPickDocFile = () => docFileRef.current?.click();
 
-  const handleDocFileChange: React.ChangeEventHandler<HTMLInputElement> = (e) => {
+  const handleDocFileChange: React.ChangeEventHandler<HTMLInputElement> = (
+    e,
+  ) => {
     const f = e.target.files?.[0] ?? null;
     if (!f) {
       setDocPreviewFile(null);
@@ -428,7 +456,9 @@ export default function ProfileForm() {
       setDocPreviewUrl("");
     } catch (err) {
       console.error("Unexpected document upload error:", err);
-      setDocUploadError("Unexpected error while uploading document. See console.");
+      setDocUploadError(
+        "Unexpected error while uploading document. See console.",
+      );
     } finally {
       setDocUploading(false);
     }
@@ -436,7 +466,7 @@ export default function ProfileForm() {
 
   /**
    * DELETE document using API:
-   * DELETE https://erp.skavosystem.com/employee/{{empId}}/documents/{{docId}}
+   * DELETE https://erp.Qurilosystem.com/employee/{{empId}}/documents/{{docId}}
    */
   const handleDeleteDocument = async (docId?: number) => {
     setDocActionError("");
@@ -481,7 +511,9 @@ export default function ProfileForm() {
       setDocuments((prev) => prev.filter((d) => d.id !== docId));
     } catch (err) {
       console.error("Unexpected delete error:", err);
-      setDocActionError("Unexpected error while deleting document. See console.");
+      setDocActionError(
+        "Unexpected error while deleting document. See console.",
+      );
     } finally {
       // unmark deleting
       setDeletingDocIds((prev) => prev.filter((id) => id !== docId));
@@ -547,48 +579,109 @@ export default function ProfileForm() {
           <p className="text-sm text-slate-600 mt-1">Profile Details</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="bg-white border rounded-xl p-6 shadow-sm">
+        <form
+          onSubmit={handleSubmit}
+          className="bg-white border rounded-xl p-6 shadow-sm"
+        >
           {/* Profile picture */}
           <div className="mb-6">
-            <div className="text-sm font-medium text-slate-700 mb-2">Profile Picture</div>
+            <div className="text-sm font-medium text-slate-700 mb-2">
+              Profile Picture
+            </div>
             <div
               onClick={onPickFile}
               className="border rounded-md h-36 flex items-center justify-center cursor-pointer bg-white hover:bg-gray-50"
             >
               {preview ? (
                 <div className="flex items-center gap-4 px-4">
-                  <img src={preview} alt="profile preview" className="h-24 w-24 object-cover rounded-full border" />
-                  <div className="text-sm text-slate-600">Click to change picture</div>
+                  <img
+                    src={preview}
+                    alt="profile preview"
+                    className="h-24 w-24 object-cover rounded-full border"
+                  />
+                  <div className="text-sm text-slate-600">
+                    Click to change picture
+                  </div>
                 </div>
               ) : (
                 <div className="text-center text-slate-400">
-                  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" className="mx-auto mb-2">
-                    <path d="M12 3v10" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M7 10l5-5 5 5" stroke="#9CA3AF" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <svg
+                    width="40"
+                    height="40"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    className="mx-auto mb-2"
+                  >
+                    <path
+                      d="M12 3v10"
+                      stroke="#9CA3AF"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"
+                      stroke="#9CA3AF"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M7 10l5-5 5 5"
+                      stroke="#9CA3AF"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                   <div className="text-sm">Choose a file</div>
                 </div>
               )}
             </div>
-            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleFileChange}
+            />
           </div>
 
           {/* Grid of fields similar to screenshot */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="col-span-1">
-              <label className="text-sm font-medium text-slate-700">Your Name <span className="text-red-500">*</span></label>
-              <Input value={profile.name || ""} onChange={(e) => handleInput("name", e.target.value)} placeholder="--" className="mt-1" />
+              <label className="text-sm font-medium text-slate-700">
+                Your Name <span className="text-red-500">*</span>
+              </label>
+              <Input
+                value={profile.name || ""}
+                onChange={(e) => handleInput("name", e.target.value)}
+                placeholder="--"
+                className="mt-1"
+              />
             </div>
 
             <div>
-              <label className="text-sm font-medium text-slate-700">Date of Birth</label>
-              <Input type="date" value={profile.birthday ?? ""} onChange={(e) => handleInput("birthday", e.target.value)} className="mt-1" />
+              <label className="text-sm font-medium text-slate-700">
+                Date of Birth
+              </label>
+              <Input
+                type="date"
+                value={profile.birthday ?? ""}
+                onChange={(e) => handleInput("birthday", e.target.value)}
+                className="mt-1"
+              />
             </div>
 
             <div>
-              <label className="text-sm font-medium text-slate-700">Gender</label>
-              <select value={profile.gender ?? ""} onChange={(e) => handleInput("gender", e.target.value)} className="mt-1 block w-full border rounded-md h-11 px-3">
+              <label className="text-sm font-medium text-slate-700">
+                Gender
+              </label>
+              <select
+                value={profile.gender ?? ""}
+                onChange={(e) => handleInput("gender", e.target.value)}
+                className="mt-1 block w-full border rounded-md h-11 px-3"
+              >
                 <option value="">--</option>
                 <option value="female">Female</option>
                 <option value="male">Male</option>
@@ -597,8 +690,14 @@ export default function ProfileForm() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-slate-700">Blood Group</label>
-              <select value={profile.bloodGroup ?? ""} onChange={(e) => handleInput("bloodGroup", e.target.value)} className="mt-1 block w-full border rounded-md h-11 px-3">
+              <label className="text-sm font-medium text-slate-700">
+                Blood Group
+              </label>
+              <select
+                value={profile.bloodGroup ?? ""}
+                onChange={(e) => handleInput("bloodGroup", e.target.value)}
+                className="mt-1 block w-full border rounded-md h-11 px-3"
+              >
                 <option value="">--</option>
                 <option>O+</option>
                 <option>O-</option>
@@ -612,22 +711,47 @@ export default function ProfileForm() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-slate-700">Email Id <span className="text-red-500">*</span></label>
-              <Input type="email" value={profile.email || ""} onChange={(e) => handleInput("email", e.target.value)} placeholder="--" className="mt-1" />
-              <p className="text-xs text-slate-400 mt-1">Must have at least 8 characters</p>
+              <label className="text-sm font-medium text-slate-700">
+                Email Id <span className="text-red-500">*</span>
+              </label>
+              <Input
+                type="email"
+                value={profile.email || ""}
+                onChange={(e) => handleInput("email", e.target.value)}
+                placeholder="--"
+                className="mt-1"
+              />
+              <p className="text-xs text-slate-400 mt-1">
+                Must have at least 8 characters
+              </p>
             </div>
 
             <div>
-              <label className="text-sm font-medium text-slate-700">Slack Member Id</label>
+              <label className="text-sm font-medium text-slate-700">
+                Slack Member Id
+              </label>
               <div className="flex mt-1">
-                <span className="inline-flex items-center px-3 border border-r-0 rounded-l-md bg-gray-50 text-slate-600">@</span>
-                <input value={profile.slackMemberId ?? ""} onChange={(e) => handleInput("slackMemberId", e.target.value)} className="border rounded-r-md h-11 px-3 w-full" placeholder="--" />
+                <span className="inline-flex items-center px-3 border border-r-0 rounded-l-md bg-gray-50 text-slate-600">
+                  @
+                </span>
+                <input
+                  value={profile.slackMemberId ?? ""}
+                  onChange={(e) => handleInput("slackMemberId", e.target.value)}
+                  className="border rounded-r-md h-11 px-3 w-full"
+                  placeholder="--"
+                />
               </div>
             </div>
 
             <div>
-              <label className="text-sm font-medium text-slate-700">Marital Status</label>
-              <select value={profile.maritalStatus ?? ""} onChange={(e) => handleInput("maritalStatus", e.target.value)} className="mt-1 block w-full border rounded-md h-11 px-3">
+              <label className="text-sm font-medium text-slate-700">
+                Marital Status
+              </label>
+              <select
+                value={profile.maritalStatus ?? ""}
+                onChange={(e) => handleInput("maritalStatus", e.target.value)}
+                className="mt-1 block w-full border rounded-md h-11 px-3"
+              >
                 <option value="">--</option>
                 <option value="single">Single</option>
                 <option value="married">Married</option>
@@ -636,8 +760,14 @@ export default function ProfileForm() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-slate-700">Language</label>
-              <select value={profile.language ?? ""} onChange={(e) => handleInput("language", e.target.value)} className="mt-1 block w-full border rounded-md h-11 px-3">
+              <label className="text-sm font-medium text-slate-700">
+                Language
+              </label>
+              <select
+                value={profile.language ?? ""}
+                onChange={(e) => handleInput("language", e.target.value)}
+                className="mt-1 block w-full border rounded-md h-11 px-3"
+              >
                 <option value="">--</option>
                 <option value="French">French</option>
                 <option value="English">English</option>
@@ -646,8 +776,14 @@ export default function ProfileForm() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-slate-700">Country</label>
-              <select value={profile.country ?? "usa"} onChange={(e) => handleInput("country", e.target.value)} className="mt-1 block w-full border rounded-md h-11 px-3">
+              <label className="text-sm font-medium text-slate-700">
+                Country
+              </label>
+              <select
+                value={profile.country ?? "usa"}
+                onChange={(e) => handleInput("country", e.target.value)}
+                className="mt-1 block w-full border rounded-md h-11 px-3"
+              >
                 <option>usa</option>
                 <option>United States</option>
                 <option>United Kingdom</option>
@@ -657,22 +793,43 @@ export default function ProfileForm() {
             </div>
 
             <div className="col-span-1 md:col-span-1 lg:col-span-1">
-              <label className="text-sm font-medium text-slate-700">Mobile</label>
+              <label className="text-sm font-medium text-slate-700">
+                Mobile
+              </label>
               <div className="flex mt-1">
-                <div className="inline-flex items-center px-3 border rounded-l-md bg-gray-50 text-slate-600">+370</div>
-                <input value={profile.mobile ?? ""} onChange={(e) => handleInput("mobile", e.target.value)} className="border rounded-r-md h-11 px-3 w-full" placeholder="--" />
+                <div className="inline-flex items-center px-3 border rounded-l-md bg-gray-50 text-slate-600">
+                  +370
+                </div>
+                <input
+                  value={profile.mobile ?? ""}
+                  onChange={(e) => handleInput("mobile", e.target.value)}
+                  className="border rounded-r-md h-11 px-3 w-full"
+                  placeholder="--"
+                />
               </div>
             </div>
           </div>
 
           <div className="mt-4">
-            <label className="text-sm font-medium text-slate-700">Address</label>
-            <Textarea value={profile.address ?? ""} onChange={(e) => handleInput("address", e.target.value)} className="mt-1 h-20" placeholder="--" />
+            <label className="text-sm font-medium text-slate-700">
+              Address
+            </label>
+            <Textarea
+              value={profile.address ?? ""}
+              onChange={(e) => handleInput("address", e.target.value)}
+              className="mt-1 h-20"
+              placeholder="--"
+            />
           </div>
 
           <div className="mt-4">
             <label className="text-sm font-medium text-slate-700">About</label>
-            <Textarea value={profile.about ?? ""} onChange={(e) => handleInput("about", e.target.value)} className="mt-1 h-28" placeholder="--" />
+            <Textarea
+              value={profile.about ?? ""}
+              onChange={(e) => handleInput("about", e.target.value)}
+              className="mt-1 h-28"
+              placeholder="--"
+            />
           </div>
 
           {/* message / error */}
@@ -681,7 +838,9 @@ export default function ProfileForm() {
               <Alert className="bg-green-50 border-green-200">
                 <div className="flex items-center gap-2">
                   <Check className="w-4 h-4 text-green-600" />
-                  <AlertDescription className="text-green-800">{message}</AlertDescription>
+                  <AlertDescription className="text-green-800">
+                    {message}
+                  </AlertDescription>
                 </div>
               </Alert>
             )}
@@ -713,10 +872,7 @@ export default function ProfileForm() {
 
         {/* Emergency Details Section */}
 
-        <EmergencyContactsSection
-          employeeId={profile.employeeId}
-        />
-
+        <EmergencyContactsSection employeeId={profile.employeeId} />
 
         {/* Documents Section (ADDED) */}
 
@@ -724,11 +880,6 @@ export default function ProfileForm() {
           <Link href="/settings" className="underline">Back to settings</Link>
         </div> */}
       </div>
-
-
-
-
-
     </div>
   );
 }

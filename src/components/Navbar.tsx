@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
@@ -6,7 +5,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { Bell, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import NotificationBell from "./NotificationBell";
-
 
 const NAV_ITEMS: Record<string, string> = {
   "/dashboard": "Dashboard",
@@ -43,7 +41,6 @@ const NAV_ITEMS: Record<string, string> = {
   "/settings/company-settings": "Company-settings",
   "/settings/profile-settings": "Profile-settings",
   "/employees/settings/profile-settings": "Profile-settings",
-
 };
 
 interface EmployeeProfile {
@@ -53,13 +50,12 @@ interface EmployeeProfile {
 
 const LANGUAGES = [
   { code: "en", label: "English" },
-  { code: "pl", label: "Polski" },      // Polish
-  { code: "ru", label: "Русский" },     // Russian
-  { code: "lt", label: "Lietuvių" },    // Lithuanian
-  { code: "de", label: "Deutsch" },     // German
-  { code: "nl", label: "Nederlands" },  // Dutch
+  { code: "pl", label: "Polski" }, // Polish
+  { code: "ru", label: "Русский" }, // Russian
+  { code: "lt", label: "Lietuvių" }, // Lithuanian
+  { code: "de", label: "Deutsch" }, // German
+  { code: "nl", label: "Nederlands" }, // Dutch
 ];
-
 
 export const CommonNavbar: React.FC = () => {
   const pathname = usePathname();
@@ -101,7 +97,7 @@ export const CommonNavbar: React.FC = () => {
   ========================== */
   const handleLanguageChange = (lang: string) => {
     const select = document.querySelector(
-      ".goog-te-combo"
+      ".goog-te-combo",
     ) as HTMLSelectElement;
 
     if (select) {
@@ -134,8 +130,7 @@ export const CommonNavbar: React.FC = () => {
     };
 
     document.addEventListener("mousedown", handleClickOutside);
-    return () =>
-      document.removeEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
   return (
@@ -144,22 +139,16 @@ export const CommonNavbar: React.FC = () => {
         {/* ================= LEFT ================= */}
         <div className="flex items-center">
           <div className="flex items-center justify-center bg-[#15173a] h-14 w-64">
-            <span className="text-white text-2xl font-bold">skavo</span>
+            <span className="text-white text-2xl font-bold">Qurilo</span>
           </div>
 
           <div className="pl-6">
-            <h2 className="text-lg font-medium text-gray-800">
-              {pageTitle}
-            </h2>
+            <h2 className="text-lg font-medium text-gray-800">{pageTitle}</h2>
           </div>
         </div>
 
         {/* ================= RIGHT ================= */}
-        <div
-          className="flex items-center gap-3 pr-6 relative"
-          ref={menuRef}
-        >
-
+        <div className="flex items-center gap-3 pr-6 relative" ref={menuRef}>
           {/* Bell */}
           <NotificationBell />
 

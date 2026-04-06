@@ -297,7 +297,7 @@ export default function LoadingScreen({ isVisible = true }) {
         ))}
 
         <div className="__ls-content">
-          <span className="__ls-logo">Skavo initializing</span>
+          <span className="__ls-logo">Qurilo initializing</span>
 
           {/* Orbital ring system */}
           <div className="__ls-orbital">

@@ -1,10 +1,8 @@
-import React from 'react'
-import AttendanceCalendar from './components/AttendanceCalendar'
+import React from "react";
+import AttendanceCalendar from "./components/AttendanceCalendar";
 
 function page() {
-    return (
-        <AttendanceCalendar />
-    )
+  return <AttendanceCalendar />;
 }
 
-export default page
+export default page;

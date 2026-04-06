@@ -2,7 +2,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import useSWR from "swr";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import {
@@ -19,6 +18,12 @@ import { Calendar } from "@/components/ui/calendar";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import AddFollowupModal from "../_components/AddFollowupModal";
+import {
+  useDealPrioritiesQuery,
+  useDealsQuery,
+  useUpdateDealStageMutation,
+  type PriorityItem,
+} from "../api";
 
 
 import Skeleton from "react-loading-skeleton";
@@ -57,8 +62,8 @@ const DEFAULT_STAGES = [
   "generated",
   "qualified",
   "proposal",
-  "Win",
-  "Lost",
+  "WIN",
+  "LOST",
 ];
 
 
@@ -117,13 +122,6 @@ type Deal = {
   priority?: string | number | PriorityObject | null;
 };
 
-type PriorityItem = {
-  id: number;
-  status: string;
-  color?: string;
-  dealId?: number | null;
-  isGlobal?: boolean;
-};
 
 const BASE_URL = `${process.env.NEXT_PUBLIC_MAIN}`;
 
@@ -530,31 +528,18 @@ export default function DealsPage() {
     setToken(t);
   }, []);
 
-  const authFetcher = async (url: string) => {
-    if (!token) throw new Error("No access token found. Please log in.");
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) {
-      const txt = await res.text().catch(() => "");
-      throw new Error(`Failed to fetch ${url}: ${res.status} ${txt}`);
-    }
-    return res.json();
-  };
-
-  // Fetch deals (kept same endpoint as you used)
   const {
     data: deals = [],
     error: dealsError,
     isLoading: dealsLoading,
-    mutate: mutateDeals,
-  } = useSWR(token ? "/api/deals/get" : null, authFetcher);
+    refetch: refetchDeals,
+  } = useDealsQuery({ enabled: Boolean(token) });
 
-  // Fetch global priorities list
-  const { data: priorities = [] as PriorityItem[] } = useSWR(
-    token ? `${BASE_URL}/deals/admin/priorities` : null,
-    authFetcher,
-  );
+  const { data: priorities = [], error: prioritiesError } = useDealPrioritiesQuery({ enabled: Boolean(token) });
+  const updateDealStageMutation = useUpdateDealStageMutation();
+  const mutateDeals = async () => {
+    await refetchDeals();
+  };
 
   const priorityByStatus = useMemo(() => {
     const m = new Map<string, PriorityItem>();
@@ -615,6 +600,14 @@ export default function DealsPage() {
           new Date(a.nextDate!).getTime() -
           new Date(b.nextDate!).getTime()
       )[0];
+  };
+
+  const formatDealTags = (tags?: Array<string | { tagName?: string | null }> | null) => {
+    if (!Array.isArray(tags) || tags.length === 0) return "—";
+    const names = tags
+      .map((tag) => (typeof tag === "string" ? tag : tag?.tagName || ""))
+      .filter(Boolean);
+    return names.length > 0 ? names.join(", ") : "—";
   };
 
 
@@ -898,39 +891,44 @@ export default function DealsPage() {
     if (!token) return;
 
     try {
-      // 🔥 Optimistic update
-      mutateDeals(
-        (currentDeals: Deal[] = []) =>
-          currentDeals.map((d) =>
-            String(d.id) === String(dealId)
-              ? { ...d, priority: priorityId }
-              : d
-          ),
-        false
+      const currentDeal = (deals as Deal[]).find(
+        (d) => String(d.id) === String(dealId)
       );
+      const hasExistingPriority =
+        currentDeal?.priority !== null &&
+        typeof currentDeal?.priority !== "undefined";
 
-      const res = await fetch(
-        `${BASE_URL}/deals/${dealId}/priority`,
+      let res = await fetch(
+        `${BASE_URL}/deals/${dealId}${hasExistingPriority ? "/priority" : "/priority/assign"}`,
         {
-          method: "PUT", // 👈 change this
+          method: hasExistingPriority ? "PUT" : "POST",
           headers: {
             Authorization: `Bearer ${token}`,
             "Content-Type": "application/json",
           },
-          body: JSON.stringify({
-            priorityId: priorityId,
-          }),
+          body: JSON.stringify({ priorityId }),
         }
       );
+
+      if (!res.ok && hasExistingPriority && res.status === 404) {
+        res = await fetch(`${BASE_URL}/deals/${dealId}/priority/assign`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ priorityId }),
+        });
+      }
 
       if (!res.ok) {
         const txt = await res.text();
         console.error("Priority API error:", res.status, txt);
-        await mutateDeals(); // revert
+        await mutateDeals();
         return;
       }
 
-      await mutateDeals(); // refresh from backend
+      await mutateDeals();
     } catch (err) {
       console.error("Priority update error:", err);
       await mutateDeals();
@@ -939,27 +937,13 @@ export default function DealsPage() {
 
 
 
-  // PUT stage: per your API: PUT ${baseUrl}/deals/:dealId/stage?stage=Win
   const handleStageChange = async (
     dealId: number | string,
     newStage: string,
   ) => {
     if (!token) return;
     try {
-      const url = `${BASE_URL}/deals/${dealId}/stage?stage=${encodeURIComponent(
-        newStage,
-      )}`;
-      const res = await fetch(url, {
-        method: "PUT",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        console.error("Failed to update stage:", res.status, txt);
-        return;
-      }
+      await updateDealStageMutation.mutateAsync({ id: dealId, stage: newStage });
       await mutateDeals();
     } catch (err) {
       console.error("Error updating stage:", err);
@@ -1413,8 +1397,8 @@ export default function DealsPage() {
                               <SelectItem value="Qualified">
                                 Qualified
                               </SelectItem>
-                              <SelectItem value="Win">Win</SelectItem>
-                              <SelectItem value="Lost">Lost</SelectItem>
+                              <SelectItem value="WIN">Win</SelectItem>
+                              <SelectItem value="LOST">Lost</SelectItem>
                             </>
                           )} */}
 
@@ -1516,10 +1500,7 @@ export default function DealsPage() {
                     </TableCell>
 
                     <TableCell className="text-sm text-muted-foreground">
-                      {(deal.tags &&
-                        deal.tags.length > 0 &&
-                        deal.tags.join(", ")) ||
-                        "—"}
+                      {formatDealTags(deal.tags as Array<string | { tagName?: string | null }> | null)}
                     </TableCell>
 
                     <TableCell className="text-right">

@@ -23,7 +23,8 @@ interface Project {
   client?: {
     name: string;
     clientId?: string;
-    profilePictureUrl?: string } | null;
+    profilePictureUrl?: string;
+  } | null;
   summary?: string;
   currency: string;
   budget: number;
@@ -96,7 +97,7 @@ const polarToCartesian = (
   cx: number,
   cy: number,
   r: number,
-  angleInDegrees: number
+  angleInDegrees: number,
 ) => {
   const angleUSDadians = ((angleInDegrees - 90) * Math.PI) / 180.0;
   return {
@@ -110,7 +111,7 @@ const describeArc = (
   cy: number,
   r: number,
   startAngle: number,
-  endAngle: number
+  endAngle: number,
 ) => {
   const start = polarToCartesian(cx, cy, r, endAngle);
   const end = polarToCartesian(cx, cy, r, startAngle);
@@ -153,7 +154,7 @@ function TaskStatistics({ projectId }: { projectId: number }) {
       } catch (err: any) {
         console.error(
           "Failed to load task statistics:",
-          err?.response?.data ?? err?.message ?? err
+          err?.response?.data ?? err?.message ?? err,
         );
         if (mounted) {
           setError("Failed to load task statistics");
@@ -198,7 +199,7 @@ function TaskStatistics({ projectId }: { projectId: number }) {
       const matched = statuses.find(
         (s) =>
           stageName &&
-          String(s.name).toLowerCase().includes(stageName.toLowerCase())
+          String(s.name).toLowerCase().includes(stageName.toLowerCase()),
       );
       if (matched) {
         const cur = map.get(matched.id) ?? { status: matched, count: 0 };
@@ -261,61 +262,57 @@ function TaskStatistics({ projectId }: { projectId: number }) {
             <div className="h-4 w-36 bg-gray-200 rounded" />
           </div>
         </div>
-      )
+      ) : error ? (
+        <div className="py-6 text-center text-red-500">{error}</div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="flex items-center">
+            <svg
+              viewBox="0 0 100 100"
+              width="180"
+              height="180"
+              className="flex-shrink-0"
+            >
+              {/* background circle if no data */}
+              {slices.length === 0 && (
+                <circle cx="50" cy="50" r="40" fill="#e5e7eb" />
+              )}
+              {slices.map((s, idx) => (
+                <path
+                  key={idx}
+                  d={describeArc(50, 50, 40, s.start, s.end)}
+                  fill={s.color}
+                  stroke="#ffffff"
+                  strokeWidth="0.5"
+                />
+              ))}
+            </svg>
+          </div>
 
-
-
-        : error ? (
-          <div className="py-6 text-center text-red-500">{error}</div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="flex items-center">
-              <svg
-                viewBox="0 0 100 100"
-                width="180"
-                height="180"
-                className="flex-shrink-0"
-              >
-                {/* background circle if no data */}
-                {slices.length === 0 && (
-                  <circle cx="50" cy="50" r="40" fill="#e5e7eb" />
-                )}
-                {slices.map((s, idx) => (
-                  <path
-                    key={idx}
-                    d={describeArc(50, 50, 40, s.start, s.end)}
-                    fill={s.color}
-                    stroke="#ffffff"
-                    strokeWidth="0.5"
-                  />
-                ))}
-              </svg>
-            </div>
-
-            <div className="flex flex-col justify-center">
-              <ul className="space-y-3 text-sm">
-                {counts.map((c, idx) => {
-                  const color =
-                    normalizeLabelColor(c.status.labelColor) ||
-                    nameColorFallback(c.status.name);
-                  return (
-                    <li key={idx} className="flex items-center gap-3">
-                      <span
-                        style={{ width: 18, height: 12, background: color }}
-                        className="rounded-sm inline-block"
-                      />
-                      <span className="flex-1">{c.status.name}</span>
-                      <span className="text-xs text-gray-500">{c.count}</span>
-                    </li>
-                  );
-                })}
-              </ul>
-              <div className="mt-4 text-xs text-gray-500">
-                Total tasks: {total}
-              </div>
+          <div className="flex flex-col justify-center">
+            <ul className="space-y-3 text-sm">
+              {counts.map((c, idx) => {
+                const color =
+                  normalizeLabelColor(c.status.labelColor) ||
+                  nameColorFallback(c.status.name);
+                return (
+                  <li key={idx} className="flex items-center gap-3">
+                    <span
+                      style={{ width: 18, height: 12, background: color }}
+                      className="rounded-sm inline-block"
+                    />
+                    <span className="flex-1">{c.status.name}</span>
+                    <span className="text-xs text-gray-500">{c.count}</span>
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="mt-4 text-xs text-gray-500">
+              Total tasks: {total}
             </div>
           </div>
-        )}
+        </div>
+      )}
     </div>
   );
 }
@@ -339,7 +336,6 @@ export default function ProjectDetailsPage() {
   // New: metrics state fetched from /projects/{projectId}/metrics
   // const [metrics, setMetrics] = useState<any | null>(null);
 
-
   type ProjectMetrics = {
     totalTimeLoggedMinutes?: number;
     currency?: string;
@@ -351,126 +347,116 @@ export default function ProjectDetailsPage() {
 
   const [metrics, setMetrics] = useState<ProjectMetrics | null>(null);
 
-
   const [metricsLoading, setMetricsLoading] = useState(false);
 
   // Fetch project; fallback demo so UI always matches preview
-//   const getProjectDetails = async (accessToken: string) => {
-//     try {
-//       const res = await fetch(`/api/work/project/${id}`, {
-//         headers: accessToken
-//           ? { Authorization: `Bearer ${accessToken}` }
-//           : undefined,
-//       });
-//       if (!res.ok) throw new Error("Failed to fetch");
-//       const data = await res.json();
-//       setProject(Array.isArray(data) ? data[0] : data);
-//     } catch (err) {
-//       // fallback demo data
-//       setProject({
-//         id: Number(id || 1),
-//         shortCode: "PRJ-001",
-//         name: "Project Name",
-//         category: "Website",
-//         startDate: "2025-08-02",
-//         deadline: "2025-09-12",
-//         client: {
-//           name: "John Doe",
-//           profilePictureUrl: "https://i.pravatar.cc/80?img=5",
-//         },
-//         summary: "Short description of the project and goals.",
-//         currency: "$",
-//         budget: 0,
-//         hoursEstimate: 40,
-//         assignedEmployees: [
-//           {
-//             employeeId: "1",
-//             name: "Aman Sharma",
-//             designation: "Developer",
-//             department: "Engineering",
-//           },
-//           {
-//             employeeId: "2",
-//             name: "Riya Singh",
-//             designation: "Designer",
-//             department: "Design",
-//           },
-//         ],
-//         progressPercent: 76,
-//         totalTimeLoggedMinutes: 300,
-//         createdBy: "Admin",
-//         createdAt: new Date().toISOString(),
-//         pinned: false,
-//         archived: false,
-//       });
+  //   const getProjectDetails = async (accessToken: string) => {
+  //     try {
+  //       const res = await fetch(`/api/work/project/${id}`, {
+  //         headers: accessToken
+  //           ? { Authorization: `Bearer ${accessToken}` }
+  //           : undefined,
+  //       });
+  //       if (!res.ok) throw new Error("Failed to fetch");
+  //       const data = await res.json();
+  //       setProject(Array.isArray(data) ? data[0] : data);
+  //     } catch (err) {
+  //       // fallback demo data
+  //       setProject({
+  //         id: Number(id || 1),
+  //         shortCode: "PRJ-001",
+  //         name: "Project Name",
+  //         category: "Website",
+  //         startDate: "2025-08-02",
+  //         deadline: "2025-09-12",
+  //         client: {
+  //           name: "John Doe",
+  //           profilePictureUrl: "https://i.pravatar.cc/80?img=5",
+  //         },
+  //         summary: "Short description of the project and goals.",
+  //         currency: "$",
+  //         budget: 0,
+  //         hoursEstimate: 40,
+  //         assignedEmployees: [
+  //           {
+  //             employeeId: "1",
+  //             name: "Aman Sharma",
+  //             designation: "Developer",
+  //             department: "Engineering",
+  //           },
+  //           {
+  //             employeeId: "2",
+  //             name: "Riya Singh",
+  //             designation: "Designer",
+  //             department: "Design",
+  //           },
+  //         ],
+  //         progressPercent: 76,
+  //         totalTimeLoggedMinutes: 300,
+  //         createdBy: "Admin",
+  //         createdAt: new Date().toISOString(),
+  //         pinned: false,
+  //         archived: false,
+  //       });
 
+  // const projectData = Array.isArray(data) ? data[0] : data;
 
+  // setProject({
+  //   ...projectData,
+  //   client: {
+  //     name: projectData.client?.name || "Unknown",
+  //     clientId:
+  //       projectData.client?.clientId ||   // ✅ correct source
+  //       projectData.clientId ||           // fallback
+  //       "",
+  //     profilePictureUrl: projectData.client?.profilePictureUrl,
+  //   },
+  // });
 
-// const projectData = Array.isArray(data) ? data[0] : data;
+  //     } finally {
+  //       setLoading(false);
+  //     }
+  //   };
 
-// setProject({
-//   ...projectData,
-//   client: {
-//     name: projectData.client?.name || "Unknown",
-//     clientId:
-//       projectData.client?.clientId ||   // ✅ correct source
-//       projectData.clientId ||           // fallback
-//       "",
-//     profilePictureUrl: projectData.client?.profilePictureUrl,
-//   },
-// });
+  const getProjectDetails = async (accessToken: string) => {
+    try {
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_MAIN}/projects/${id}`,
+        {
+          headers: accessToken
+            ? { Authorization: `Bearer ${accessToken}` }
+            : undefined,
+        },
+      );
 
+      if (!res.ok) {
+        console.error("API FAILED:", res.status);
+        throw new Error("Failed to fetch");
+      }
 
-//     } finally {
-//       setLoading(false);
-//     }
-//   };
+      const data = await res.json();
 
+      // console.log("API DATA 👉", data);
 
-const getProjectDetails = async (accessToken: string) => {
-  try {
-const res = await fetch(`${process.env.NEXT_PUBLIC_MAIN}/projects/${id}`, {  
-      headers: accessToken
-        ? { Authorization: `Bearer ${accessToken}` }
-        : undefined,
-    });
+      const projectData = Array.isArray(data) ? data[0] : data;
 
-    if (!res.ok) {
-      console.error("API FAILED:", res.status);
-      throw new Error("Failed to fetch");
+      setProject({
+        ...projectData,
+        client: {
+          name: projectData.client?.name || "Unknown",
+          clientId: projectData.client?.clientId || projectData.clientId || "",
+          profilePictureUrl: projectData.client?.profilePictureUrl,
+        },
+      });
+    } catch (err) {
+      console.error("PROJECT FETCH ERROR:", err);
+      setProject(null);
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const data = await res.json();
-
-    // console.log("API DATA 👉", data);
-
-    const projectData = Array.isArray(data) ? data[0] : data;
-
-    setProject({
-      ...projectData,
-      client: {
-        name: projectData.client?.name || "Unknown",
-        clientId:
-          projectData.client?.clientId ||
-          projectData.clientId ||
-          "",
-        profilePictureUrl: projectData.client?.profilePictureUrl,
-      },
-    });
-
-  } catch (err) {
-    console.error("PROJECT FETCH ERROR:", err);
-    setProject(null);
-  } finally {
-    setLoading(false);
-  }
-};
-
-
-
-
-// console.log("hellooooo",project?.client);
-
+  // console.log("hellooooo",project?.client);
 
   // Fetch metrics (new)
   const fetchMetrics = async (accessToken: string) => {
@@ -502,21 +488,14 @@ const res = await fetch(`${process.env.NEXT_PUBLIC_MAIN}/projects/${id}`, {
   // if (!project)
   //   return <p className="p-8 text-center text-red-600">Project not found</p>;
 
-
-if (!project) {
-  return (
-    <p className="p-8 text-center text-red-600">
-      Project not found
-    </p>
-  );
-}
-
+  if (!project) {
+    return <p className="p-8 text-center text-red-600">Project not found</p>;
+  }
 
   // derive totals: prefer metrics if available, otherwise fall back to project
   const totalMinutes =
     metrics?.totalTimeLoggedMinutes ?? project.totalTimeLoggedMinutes ?? 0;
   // const totalHours = Math.floor((totalMinutes || 0) / 60);
-
 
   const totalHours = Math.floor(totalMinutes / 60);
   const totalMinutesRemaining = totalMinutes % 60;
@@ -527,7 +506,7 @@ if (!project) {
       ? metrics.earning
       : typeof metrics?.earning === "string"
         ? Number(metrics.earning)
-        : project.budget ?? 0;
+        : (project.budget ?? 0);
   const expenses = typeof metrics?.expenses === "number" ? metrics.expenses : 0;
   const profit =
     typeof metrics?.profit === "number" ? metrics.profit : earnings - expenses;
@@ -541,15 +520,15 @@ if (!project) {
   const plannedBarWidth =
     hoursEstimate > 0
       ? Math.min(
-        100,
-        Math.round(
-          (hoursEstimate / Math.max(hoursEstimate, totalHours || 1)) * 100
+          100,
+          Math.round(
+            (hoursEstimate / Math.max(hoursEstimate, totalHours || 1)) * 100,
+          ),
         )
-      )
       : 50;
   const actualBarWidth = Math.min(
     100,
-    Math.round((totalHours / Math.max(hoursEstimate, totalHours || 1)) * 100)
+    Math.round((totalHours / Math.max(hoursEstimate, totalHours || 1)) * 100),
   );
 
   return (
@@ -561,8 +540,6 @@ if (!project) {
             {project.name}
           </h1>
         </div> */}
-
-
 
         {loading ? (
           <div className="h-8 w-64 bg-gray-200 rounded animate-pulse" />
@@ -611,9 +588,6 @@ if (!project) {
         <div className="mt-6 space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-6">
-
-
-
               {loading ? (
                 <div className="animate-pulse space-y-4">
                   <div className="h-6 w-40 bg-gray-200 rounded" />
@@ -622,7 +596,6 @@ if (!project) {
                 </div>
               ) : (
                 <>
-
                   <div className="flex items-center justify-between gap-6">
                     <div className="flex items-center gap-6">
                       <div className="w-36 h-20">
@@ -651,9 +624,6 @@ if (!project) {
                         {project.progressPercent}%
                       </text>
                     </svg> */}
-
-
-
 
                         <div className="w-36 h-20">
                           <svg viewBox="0 0 100 50" className="w-full h-full">
@@ -690,9 +660,6 @@ if (!project) {
                             </text>
                           </svg>
                         </div>
-
-
-
                       </div>
 
                       <div>
@@ -711,9 +678,8 @@ if (!project) {
                           {project.noDeadline
                             ? "No Deadline"
                             : project.deadline
-                              ?
-                              //  new Date(project.deadline).toLocaleDateString()
-                              format(new Date(project.deadline), "dd-MM-yyyy")
+                              ? //  new Date(project.deadline).toLocaleDateString()
+                                format(new Date(project.deadline), "dd-MM-yyyy")
                               : "TBD"}
                         </p>
                       </div>
@@ -731,9 +697,6 @@ if (!project) {
                   </div>
                 </>
               )}
-
-
-
             </div>
 
             <div className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-4">
@@ -749,17 +712,17 @@ if (!project) {
                   <UserIcon className="w-8 h-8 text-gray-400" />
                 )}
               </div>
-             <div>
-  <p className="text-sm text-gray-500">Client</p>
+              <div>
+                <p className="text-sm text-gray-500">Client</p>
 
-  <p className="font-medium">
-    {project.client?.name || "Unknown Client"}
-  </p>
+                <p className="font-medium">
+                  {project.client?.name || "Unknown Client"}
+                </p>
 
-  <p className="text-xs text-gray-400">
-    {project.client?.clientId || "No Client ID"}
-  </p>
-</div>
+                <p className="text-xs text-gray-400">
+                  {project.client?.clientId || "No Client ID"}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -768,15 +731,10 @@ if (!project) {
             <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-6">
               <h3 className="text-lg font-medium mb-4">Task Statistics</h3>
               <TaskStatistics projectId={project.id} />
-
-
             </div>
-
-
 
             {/* Single Hours Logged chart placed immediately below TaskStatistics (only once) */}
             <div className="mt-6 bg-white rounded border border-gray-200 p-4 shadow-sm">
-
               {metricsLoading ? (
                 <div className="animate-pulse space-y-4">
                   <div className="h-4 w-32 bg-gray-200 rounded" />
@@ -784,8 +742,6 @@ if (!project) {
                 </div>
               ) : (
                 <>
-
-
                   <div className="flex items-center justify-between mb-3">
                     <h4 className="text-sm font-medium">Hours Logged</h4>
                     <div className="text-xs text-gray-500">
@@ -794,9 +750,6 @@ if (!project) {
                         ? "Loading..."
                         : `${totalHours} hrs ${totalMinutesRemaining} min`}
                     </div>
-
-
-
                   </div>
                 </>
               )}
@@ -867,8 +820,6 @@ if (!project) {
               </div>
             </div>
             {/* end Hours Logged chart */}
-
-
           </div>
 
           {/* Bottom row */}
@@ -879,7 +830,7 @@ if (!project) {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {project.assignedEmployees &&
-                  project.assignedEmployees.length ? (
+                project.assignedEmployees.length ? (
                   project.assignedEmployees.map((emp) => (
                     <div
                       key={emp.employeeId}
@@ -958,11 +909,10 @@ if (!project) {
         {/* other components shown for reference */}
         <div className="mt-6 grid grid-cols-1 lg:grid-rows-2 gap-2">
           <ProjectMembersTable projectId={project.id} />
-          {/* <TimesheetsTableNew gatewayPath="https://erp.skavosystem.com/timesheets" /> */}
+          {/* <TimesheetsTableNew gatewayPath="https://erp.Qurilosystem.com/timesheets" /> */}
           <MilestonesTable projectId={project.id} />
         </div>
       </div>
     </div>
   );
 }
-

@@ -1,19 +1,20 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { Stage } from "@/types/stages";
+import {
+  useDealDetailQuery,
+  useDealEmployeesQuery,
+  useStagesQuery,
+  useUpdateDealMutation,
+} from "../../api";
 
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 
 
 
-type Employee = {
-  employeeId: string;
-  name: string;
-};
 
 export default function EditDealPage() {
   const router = useRouter();
@@ -33,71 +34,43 @@ export default function EditDealPage() {
     dealContact: "",
   });
 
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [stages, setStages] = useState<Stage[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  // Fetch existing deal + employees + stages
+  const { data: employees = [], isLoading: employeesLoading, error: employeesError } = useDealEmployeesQuery();
+  const { data: stages = [], isLoading: stagesLoading, error: stagesError } = useStagesQuery();
+  const { data: deal, isLoading: dealLoading, error: dealError } = useDealDetailQuery(dealId, { enabled: Boolean(dealId) });
+  const updateDealMutation = useUpdateDealMutation({
+    onSuccess: async () => {
+      setSuccess("Deal updated successfully!");
+      setTimeout(() => router.push("/deals/get"), 1000);
+    },
+  });
+  const loading = updateDealMutation.isPending;
+  const initialLoading = employeesLoading || stagesLoading || dealLoading;
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const token = localStorage.getItem("accessToken");
-        if (!token) {
-          setError("No access token found. Please log in.");
-          return;
-        }
+    const combinedError = employeesError || stagesError || dealError;
+    if (combinedError) {
+      setError(combinedError.message || "Failed to load deal data. Please try again later.");
+    }
+  }, [dealError, employeesError, stagesError]);
 
-        // Fetch employees
-        const empRes = await fetch("/api/hr/employee", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!empRes.ok) throw new Error("Failed to fetch employees");
-        const empData = await empRes.json();
-        setEmployees(empData.content || []);
-
-        // Fetch stages
-        const stageRes = await fetch("/api/deals/stages", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!stageRes.ok) throw new Error("Failed to fetch deal stages");
-        const stageData: Stage[] = await stageRes.json();
-        setStages(stageData);
-
-        // Fetch deal details
-        const dealRes = await fetch(`/api/deals/get/${dealId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!dealRes.ok) throw new Error("Failed to fetch deal details");
-        const deal = await dealRes.json();
-
-        // Prefill form with deal data
-        setFormData({
-          title: deal.title || "",
-          leadId: deal.leadId ? String(deal.leadId) : "",
-          pipeline: deal.pipeline || "",
-          dealStage: deal.dealStage || (stageData[0]?.name ?? ""),
-          dealCategory: deal.dealCategory || "",
-          dealAgent: deal.dealAgent || "",
-          dealWatchers: deal.dealWatchers || [],
-          value: deal.value ? String(deal.value) : "",
-          expectedCloseDate: deal.expectedCloseDate
-            ? deal.expectedCloseDate.split("T")[0]
-            : "",
-          dealContact: deal.dealContact || "",
-        });
-      } catch (err) {
-        console.error(err);
-        setError("Failed to load deal data. Please try again later.");
-      } finally {
-        setInitialLoading(false);
-      }
-    };
-
-    if (dealId) fetchData();
-  }, [dealId]);
+  useEffect(() => {
+    if (!deal) return;
+    setFormData({
+      title: deal.title || "",
+      leadId: deal.leadId ? String(deal.leadId) : "",
+      pipeline: deal.pipeline || "",
+      dealStage: deal.dealStage || (stages[0]?.name ?? ""),
+      dealCategory: deal.dealCategory || "",
+      dealAgent: deal.dealAgent || "",
+      dealWatchers: deal.dealWatchers || [],
+      value: deal.value ? String(deal.value) : "",
+      expectedCloseDate: deal.expectedCloseDate ? deal.expectedCloseDate.split("T")[0] : "",
+      dealContact: deal.dealContact || "",
+    });
+  }, [deal, stages]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -118,7 +91,6 @@ export default function EditDealPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
     setSuccess(null);
 
@@ -132,17 +104,10 @@ export default function EditDealPage() {
       !formData.expectedCloseDate
     ) {
       setError("Please fill all required fields.");
-      setLoading(false);
       return;
     }
 
     try {
-      const token = localStorage.getItem("accessToken");
-      if (!token) {
-        setError("No access token found. Please log in.");
-        return;
-      }
-
       const payload = {
         title: formData.title,
         leadId: formData.leadId ? Number(formData.leadId) : undefined,
@@ -156,24 +121,10 @@ export default function EditDealPage() {
         dealContact: formData.dealContact,
       };
 
-      const res = await fetch(`/api/deals/create/${dealId}`, {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) throw new Error("Failed to update deal");
-
-      setSuccess("Deal updated successfully!");
-      setTimeout(() => router.push("/deals/get"), 2000);
+      await updateDealMutation.mutateAsync({ id: dealId, payload });
     } catch (err) {
       console.error(err);
-      setError("Failed to update deal. Please try again.");
-    } finally {
-      setLoading(false);
+      setError(err instanceof Error ? err.message : "Failed to update deal. Please try again.");
     }
   };
 

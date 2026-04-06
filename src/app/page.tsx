@@ -5,7 +5,6 @@ export default function Home() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500 via-indigo-500 to-purple-600 p-4">
       <div className="backdrop-blur-lg bg-white/20 border border-white/30 rounded-3xl shadow-2xl w-full max-w-md p-10 text-center animate-in fade-in zoom-in-95 duration-500">
-
         {/* Title */}
         <h1 className="text-3xl font-bold text-white drop-shadow-sm mb-2">
           Welcome Back 👋
@@ -44,10 +43,9 @@ export default function Home() {
 
         {/* Footer */}
         <p className="mt-10 text-xs text-white/70">
-          © {new Date().getFullYear()} SKAVO — All Rights Reserved
+          © {new Date().getFullYear()} Qurilo — All Rights Reserved
         </p>
       </div>
     </div>
   );
 }
-

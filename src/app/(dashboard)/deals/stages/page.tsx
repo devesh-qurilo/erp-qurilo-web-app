@@ -2,9 +2,9 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import useSWR from "swr";
 import type { Stage } from "@/types/stages";
 import type { Deal } from "@/types/deals";
+import { useDealsQuery, useStagesQuery } from "../api";
 import AddStagePanel from "./_components/add-stages-panel";
 import KanbanBoard from "./_components/kanban-board";
 import { Button } from "@/components/ui/button";
@@ -78,28 +78,27 @@ export default function StagesPage() {
     setToken(t);
   }, []);
 
-  const fetchWithAuth = async (url: string) => {
-    if (!token) throw new Error("No access token found. Please log in.");
-    const res = await fetch(url, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    if (!res.ok) throw new Error(`Failed to fetch ${url}`);
-    return res.json();
-  };
-
   const {
     data: stagesData = [],
     isLoading: stagesLoading,
     error: stagesError,
-    mutate: mutateStages,
-  } = useSWR<Stage[]>(token ? "/api/deals/stages" : null, fetchWithAuth);
+    refetch: refetchStages,
+  } = useStagesQuery({ enabled: Boolean(token) });
 
   const {
     data: dealsData = [],
     isLoading: dealsLoading,
     error: dealsError,
-    mutate: mutateDeals,
-  } = useSWR<Deal[]>(token ? "/api/deals/get" : null, fetchWithAuth);
+    refetch: refetchDeals,
+  } = useDealsQuery({ enabled: Boolean(token) });
+
+  const mutateStages = async () => {
+    await refetchStages();
+  };
+
+  const mutateDeals = async () => {
+    await refetchDeals();
+  };
 
 
 

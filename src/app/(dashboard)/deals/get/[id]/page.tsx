@@ -205,7 +205,7 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
         return;
       }
 
-      const res = await fetch(`/api/deals/get/${dealId}`, {
+      const res = await fetch(`${BASE_URL}/deals/${dealId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
@@ -496,7 +496,7 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
 
 
 
-      const empRes = await fetch(`${BASE_URL}/employee/all?page=0&size=2000`, {
+      const empRes = await fetch(`${BASE_URL}/employee/all`, {
         headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       });
 
@@ -2114,7 +2114,7 @@ if (loading) {
 
                       {tags.map((t, idx) => {
                         // t can be either TagItem or string (server inconsistency). Render name accordingly.
-                        const tagName = typeof t === "string" ? t : t.tagName;
+                        const tagName = typeof t === "string" ? t : (t.tagName || "Untitled tag");
                         const tagId = typeof t === "string" ? undefined : t.id;
                         const key = `${typeof t === "string" ? t : (t.id ?? t.tagName)}-${idx}`;
                         return (

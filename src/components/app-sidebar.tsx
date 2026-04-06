@@ -40,7 +40,6 @@ export function AppSidebar() {
     settings: false,
   });
 
-
   const pathname = usePathname();
   const isActive = (path: string) => pathname.startsWith(path);
 
@@ -50,7 +49,6 @@ export function AppSidebar() {
   const Chevron = ({ open }: { open: boolean }) => (
     <span className="ml-2  text-sidebar-foreground/60">{open ? "▾" : ">"}</span>
   );
-
 
   useEffect(() => {
     setOpenGroups({
@@ -69,7 +67,7 @@ export function AppSidebar() {
       <Sidebar className="#211C52">
         <SidebarHeader>
           <div className="flex items-center justify-center  px-1 py-6">
-            {/* <h1 className="text-2xl font-bold text-sidebar-primary">Skavo</h1> */}
+            {/* <h1 className="text-2xl font-bold text-sidebar-primary">Qurilo</h1> */}
           </div>
         </SidebarHeader>
 
@@ -86,17 +84,14 @@ export function AppSidebar() {
 
                   <Link
                     href="/dashboard"
-                    className={`flex items-center gap-2 px-2 py-1 rounded-md ${isActive("/dashboard")
+                    className={`flex items-center gap-2 px-2 py-1 rounded-md ${
+                      isActive("/dashboard")
                         ? "bg-white text-black font-semibold"
                         : "text-white"
-                      }`}
-
+                    }`}
                   >
                     <span>Dashboard</span>
-
                   </Link>
-
-
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -127,14 +122,15 @@ export function AppSidebar() {
                     {/* <Link href="/leads/admin/get">
                       <Users className="size-5" /> */}
 
-
                     <Link
                       href="/leads/admin/get"
-                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${isActive("/leads")
+                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${
+                        isActive("/leads")
                           ? "bg-white text-black font-semibold"
                           : "text-white"
-                        }`}
-                    ><Users className="size-5" />
+                      }`}
+                    >
+                      <Users className="size-5" />
 
                       <span>Leads</span>
                     </Link>
@@ -144,15 +140,14 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     {/* <Link href="/deals/get"> */}
 
-
                     <Link
                       href="/deals/get"
-                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${isActive("/deals")
+                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${
+                        isActive("/deals")
                           ? "bg-white text-black font-semibold"
                           : "text-white"
-                        }`}
+                      }`}
                     >
-
                       <Briefcase className="size-5" />
                       <span>Deals</span>
                     </Link>
@@ -188,13 +183,12 @@ export function AppSidebar() {
 
                     <Link
                       href="/clients"
-                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${isActive("/clients")
+                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${
+                        isActive("/clients")
                           ? "bg-white text-black font-semibold"
                           : "text-white"
-                        }`}
+                      }`}
                     >
-
-
                       <Building className="size-5" />
                       <span>Client</span>
                     </Link>
@@ -228,15 +222,14 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     {/* <Link href="/work/project"> */}
 
-
                     <Link
                       href="/work/project"
-                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${isActive("/work/project")
+                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${
+                        isActive("/work/project")
                           ? "bg-white text-black font-semibold"
                           : "text-white"
-                        }`}
+                      }`}
                     >
-
                       <ClipboardList className="size-5" />
                       <span>Project</span>
                     </Link>
@@ -248,12 +241,12 @@ export function AppSidebar() {
 
                     <Link
                       href="/work/tasks"
-                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${isActive("/work/tasks")
+                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${
+                        isActive("/work/tasks")
                           ? "bg-white text-black font-semibold"
                           : "text-white"
-                        }`}
+                      }`}
                     >
-
                       <ClipboardList className="size-5" />
                       <span>Task</span>
                     </Link>
@@ -263,15 +256,14 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     {/* <Link href="/work/timesheet"> */}
 
-
                     <Link
                       href="/work/timesheet"
-                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${isActive("/work/timesheet")
+                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${
+                        isActive("/work/timesheet")
                           ? "bg-white text-black font-semibold"
                           : "text-white"
-                        }`}
+                      }`}
                     >
-
                       <Clock className="size-5" />
                       <span>Timesheet</span>
                     </Link>
@@ -283,12 +275,12 @@ export function AppSidebar() {
 
                     <Link
                       href="/work/roadmap"
-                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${isActive("/work/roadmap")
+                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${
+                        isActive("/work/roadmap")
                           ? "bg-white text-black font-semibold"
                           : "text-white"
-                        }`}
+                      }`}
                     >
-
                       <Map className="size-5" />
                       <span>Project Roadmap</span>
                     </Link>
@@ -322,12 +314,12 @@ export function AppSidebar() {
 
                     <Link
                       href="/hr/employee"
-                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${isActive("/hr/employee")
+                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${
+                        isActive("/hr/employee")
                           ? "bg-white text-black font-semibold"
                           : "text-white"
-                        }`}
+                      }`}
                     >
-
                       <Users className="size-5" />
                       <span>Employee</span>
                     </Link>
@@ -340,12 +332,12 @@ export function AppSidebar() {
 
                     <Link
                       href="/hr/attendence"
-                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${isActive("/hr/attendence")
+                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${
+                        isActive("/hr/attendence")
                           ? "bg-white text-black font-semibold"
                           : "text-white"
-                        }`}
+                      }`}
                     >
-
                       <Award className="size-5" />
                       <span>Attandance</span>
                     </Link>
@@ -358,12 +350,12 @@ export function AppSidebar() {
 
                     <Link
                       href="/hr/leave/admin"
-                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${isActive("/hr/leave/admin")
+                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${
+                        isActive("/hr/leave/admin")
                           ? "bg-white text-black font-semibold"
                           : "text-white"
-                        }`}
+                      }`}
                     >
-
                       <CalendarX className="size-5" />
                       <span>Leave</span>
                     </Link>
@@ -374,15 +366,14 @@ export function AppSidebar() {
                   <SidebarMenuButton asChild>
                     {/* <Link href="/hr/holiday"> */}
 
-
                     <Link
                       href="/hr/holiday"
-                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${isActive("/hr/holiday")
+                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${
+                        isActive("/hr/holiday")
                           ? "bg-white text-black font-semibold"
                           : "text-white"
-                        }`}
+                      }`}
                     >
-
                       <CalendarDays className="size-5" />
                       <span>Holiday</span>
                     </Link>
@@ -395,12 +386,12 @@ export function AppSidebar() {
 
                     <Link
                       href="/hr/designation"
-                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${isActive("/hr/designation")
+                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${
+                        isActive("/hr/designation")
                           ? "bg-white text-black font-semibold"
                           : "text-white"
-                        }`}
+                      }`}
                     >
-
                       <Briefcase className="size-5" />
                       <span>Designation</span>
                     </Link>
@@ -413,12 +404,12 @@ export function AppSidebar() {
 
                     <Link
                       href="/hr/department"
-                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${isActive("/hr/department")
+                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${
+                        isActive("/hr/department")
                           ? "bg-white text-black font-semibold"
                           : "text-white"
-                        }`}
+                      }`}
                     >
-
                       <Briefcase className="size-5" />
                       <span>Departments</span>
                     </Link>
@@ -431,12 +422,12 @@ export function AppSidebar() {
 
                     <Link
                       href="/hr/appreciation"
-                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${isActive("/hr/appreciation")
+                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${
+                        isActive("/hr/appreciation")
                           ? "bg-white text-black font-semibold"
                           : "text-white"
-                        }`}
+                      }`}
                     >
-
                       <Award className="size-5" />
                       <span>Appreciation</span>
                     </Link>
@@ -472,13 +463,12 @@ export function AppSidebar() {
 
                     <Link
                       href="/finance/invoices"
-                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${isActive("/finance/invoices")
+                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${
+                        isActive("/finance/invoices")
                           ? "bg-white text-black font-semibold"
                           : "text-white"
-                        }`}
+                      }`}
                     >
-
-
                       <CalendarCheck className="size-5" />
                       <span>Invoices</span>
                     </Link>
@@ -491,12 +481,12 @@ export function AppSidebar() {
 
                     <Link
                       href="/finance/credit-notes"
-                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${isActive("/finance/credit-notes")
+                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${
+                        isActive("/finance/credit-notes")
                           ? "bg-white text-black font-semibold"
                           : "text-white"
-                        }`}
+                      }`}
                     >
-
                       <CalendarX className="size-5" />
                       <span>Credit Notes</span>
                     </Link>
@@ -515,12 +505,12 @@ export function AppSidebar() {
 
                   <Link
                     href="/messages"
-                    className={`flex items-center gap-2 px-2 py-1 rounded-md ${isActive("/messages")
+                    className={`flex items-center gap-2 px-2 py-1 rounded-md ${
+                      isActive("/messages")
                         ? "bg-white text-black font-semibold"
                         : "text-white"
-                      }`}
+                    }`}
                   >
-
                     <MessageSquare className="size-5" />
                     <span>Message</span>
                   </Link>
@@ -555,12 +545,12 @@ export function AppSidebar() {
 
                     <Link
                       href="/settings/company-settings"
-                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${isActive("/settings/company-settings")
+                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${
+                        isActive("/settings/company-settings")
                           ? "bg-white text-black font-semibold"
                           : "text-white"
-                        }`}
+                      }`}
                     >
-
                       <CalendarCheck className="size-5" />
                       <span>Company Settings </span>
                     </Link>
@@ -573,12 +563,12 @@ export function AppSidebar() {
 
                     <Link
                       href="/settings/profile-settings"
-                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${isActive("/settings/profile-settings")
+                      className={`flex items-center gap-2 px-2 py-1 rounded-md ${
+                        isActive("/settings/profile-settings")
                           ? "bg-white text-black font-semibold"
                           : "text-white"
-                        }`}
+                      }`}
                     >
-
                       <CalendarX className="size-5" />
                       <span>Profile Settings</span>
                     </Link>
@@ -591,7 +581,7 @@ export function AppSidebar() {
 
         <SidebarFooter className="bg-[#15173a] text-white">
           <div className="p-4 text-xs text-white text-sidebar-foreground/60 text-center border-t border-sidebar-border">
-            © 2025 Skavo
+            © 2025 Qurilo
           </div>
         </SidebarFooter>
       </Sidebar>

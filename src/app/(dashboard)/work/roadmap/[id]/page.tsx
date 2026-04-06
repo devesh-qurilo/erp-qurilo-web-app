@@ -40,8 +40,7 @@ interface Project {
   pinnedAt?: string | null;
   archived?: boolean;
   archivedAt?: string | null;
-    addedBy?: string;
-
+  addedBy?: string;
 }
 
 type StatusItem = {
@@ -94,7 +93,7 @@ const polarToCartesian = (
   cx: number,
   cy: number,
   r: number,
-  angleInDegrees: number
+  angleInDegrees: number,
 ) => {
   const angleUSDadians = ((angleInDegrees - 90) * Math.PI) / 180.0;
   return {
@@ -108,7 +107,7 @@ const describeArc = (
   cy: number,
   r: number,
   startAngle: number,
-  endAngle: number
+  endAngle: number,
 ) => {
   const start = polarToCartesian(cx, cy, r, endAngle);
   const end = polarToCartesian(cx, cy, r, startAngle);
@@ -151,7 +150,7 @@ function TaskStatistics({ projectId }: { projectId: number }) {
       } catch (err: any) {
         console.error(
           "Failed to load task statistics:",
-          err?.response?.data ?? err?.message ?? err
+          err?.response?.data ?? err?.message ?? err,
         );
         if (mounted) {
           setError("Failed to load task statistics");
@@ -196,7 +195,7 @@ function TaskStatistics({ projectId }: { projectId: number }) {
       const matched = statuses.find(
         (s) =>
           stageName &&
-          String(s.name).toLowerCase().includes(stageName.toLowerCase())
+          String(s.name).toLowerCase().includes(stageName.toLowerCase()),
       );
       if (matched) {
         const cur = map.get(matched.id) ?? { status: matched, count: 0 };
@@ -412,12 +411,8 @@ export default function ProjectDetailsPage() {
     metrics?.totalTimeLoggedMinutes ?? project.totalTimeLoggedMinutes ?? 0;
   // const totalHours = Math.floor((totalMinutes || 0) / 60);
 
-
-
   const totalHours = Math.floor(totalMinutes / 60);
   const totalMinutesRemaining = totalMinutes % 60;
-
-
 
   const currency = metrics?.currency ?? project.currency ?? "$";
   const earnings =
@@ -425,7 +420,7 @@ export default function ProjectDetailsPage() {
       ? metrics.earning
       : typeof metrics?.earning === "string"
         ? Number(metrics.earning)
-        : project.budget ?? 0;
+        : (project.budget ?? 0);
   const expenses = typeof metrics?.expenses === "number" ? metrics.expenses : 0;
   const profit =
     typeof metrics?.profit === "number" ? metrics.profit : earnings - expenses;
@@ -439,15 +434,15 @@ export default function ProjectDetailsPage() {
   const plannedBarWidth =
     hoursEstimate > 0
       ? Math.min(
-        100,
-        Math.round(
-          (hoursEstimate / Math.max(hoursEstimate, totalHours || 1)) * 100
+          100,
+          Math.round(
+            (hoursEstimate / Math.max(hoursEstimate, totalHours || 1)) * 100,
+          ),
         )
-      )
       : 50;
   const actualBarWidth = Math.min(
     100,
-    Math.round((totalHours / Math.max(hoursEstimate, totalHours || 1)) * 100)
+    Math.round((totalHours / Math.max(hoursEstimate, totalHours || 1)) * 100),
   );
 
   return (
@@ -526,46 +521,41 @@ export default function ProjectDetailsPage() {
                       </text>
                     </svg> */}
 
+                    <div className="w-36 h-20">
+                      <svg viewBox="0 0 100 50" className="w-full h-full">
+                        {/* background arc */}
+                        <path
+                          d="M5 50 A45 45 0 0 1 95 50"
+                          fill="none"
+                          stroke="#e6e6e6"
+                          strokeWidth="10"
+                          strokeLinecap="round"
+                          pathLength="100"
+                        />
 
+                        {/* progress arc */}
+                        <path
+                          d="M5 50 A45 45 0 0 1 95 50"
+                          fill="none"
+                          stroke="#f5c518"
+                          strokeWidth="10"
+                          strokeLinecap="round"
+                          pathLength="100"
+                          strokeDasharray="100"
+                          strokeDashoffset={100 - project.progressPercent}
+                        />
 
-
-<div className="w-36 h-20">
-  <svg viewBox="0 0 100 50" className="w-full h-full">
-    {/* background arc */}
-    <path
-      d="M5 50 A45 45 0 0 1 95 50"
-      fill="none"
-      stroke="#e6e6e6"
-      strokeWidth="10"
-      strokeLinecap="round"
-      pathLength="100"
-    />
-
-    {/* progress arc */}
-    <path
-      d="M5 50 A45 45 0 0 1 95 50"
-      fill="none"
-      stroke="#f5c518"
-      strokeWidth="10"
-      strokeLinecap="round"
-      pathLength="100"
-      strokeDasharray="100"
-      strokeDashoffset={100 - project.progressPercent}
-    />
-
-    <text
-      x="50"
-      y="40"
-      fontSize="8"
-      textAnchor="middle"
-      fill="#374151"
-    >
-      {project.progressPercent}%
-    </text>
-  </svg>
-</div>
-
-
+                        <text
+                          x="50"
+                          y="40"
+                          fontSize="8"
+                          textAnchor="middle"
+                          fill="#374151"
+                        >
+                          {project.progressPercent}%
+                        </text>
+                      </svg>
+                    </div>
                   </div>
 
                   <div>
@@ -574,7 +564,6 @@ export default function ProjectDetailsPage() {
                       {
                         // new Date(project.startDate).toLocaleDateString()
                         format(new Date(project.startDate), "dd-MM-yyyy")
-
                       }
                     </p>
                   </div>
@@ -585,9 +574,8 @@ export default function ProjectDetailsPage() {
                       {project.noDeadline
                         ? "No Deadline"
                         : project.deadline
-                          ?
-                          // new Date(project.deadline).toLocaleDateString()
-                          format(new Date(project.deadline), "dd-MM-yyyy")
+                          ? // new Date(project.deadline).toLocaleDateString()
+                            format(new Date(project.deadline), "dd-MM-yyyy")
                           : "TBD"}
                     </p>
                   </div>
@@ -625,11 +613,11 @@ export default function ProjectDetailsPage() {
                     `Client ID: ${project.client?.name ?? ""}`}
                 </p>
 
-   <p className="text-xs text-gray-400">
-                      {project.client?.clientId || "No Client ID"}
-                    </p>
+                <p className="text-xs text-gray-400">
+                  {project.client?.clientId || "No Client ID"}
+                </p>
 
-                {/* <p className="text-xs text-gray-400">Skavo</p> */}
+                {/* <p className="text-xs text-gray-400">Qurilo</p> */}
               </div>
             </div>
           </div>
@@ -734,7 +722,6 @@ export default function ProjectDetailsPage() {
                 <div className="text-2xl font-semibold text-blue-600 mt-2">
                   {/* {hoursEstimate}hrs 0 min */}
                   {hoursEstimate} hrs {totalMinutesRemaining} min
-
                 </div>
               </div>
 
@@ -781,7 +768,7 @@ export default function ProjectDetailsPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {project.assignedEmployees &&
-                  project.assignedEmployees.length ? (
+                project.assignedEmployees.length ? (
                   project.assignedEmployees.map((emp) => (
                     <div
                       key={emp.employeeId}
@@ -860,7 +847,7 @@ export default function ProjectDetailsPage() {
         {/* other components shown for reference */}
         <div className="mt-6 grid grid-cols-1 lg:grid-rows-2 gap-2">
           <ProjectMembersTable projectId={project.id} />
-          {/* <TimesheetsTableNew gatewayPath="https://erp.skavosystem.com/timesheets" /> */}
+          {/* <TimesheetsTableNew gatewayPath="https://erp.Qurilosystem.com/timesheets" /> */}
           <MilestonesTable projectId={project.id} />
         </div>
       </div>

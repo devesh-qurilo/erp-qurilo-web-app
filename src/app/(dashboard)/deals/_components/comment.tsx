@@ -1,8 +1,8 @@
 "use client"
 
 import type React from "react"
-import useSWR from "swr"
-import { useMemo, useState } from "react"
+import { useState } from "react"
+import { useQuery, useQueryClient, useMutation } from "@tanstack/react-query"
 
 // Types
 interface Comment {
@@ -16,8 +16,10 @@ interface DealCommentsProps {
   dealId: string
 }
 
+const BASE_URL = process.env.NEXT_PUBLIC_MAIN
+
 // Helpers
-const fetcher = async ([url, token]: [string, string | null]) => {
+const fetcher = async (url: string, token: string | null) => {
   const res = await fetch(url, {
     headers: {
       Authorization: token ? `Bearer ${token}` : "",
@@ -51,16 +53,14 @@ export default function DealComments({ dealId }: DealCommentsProps) {
   const token = typeof window !== "undefined" ? window.localStorage.getItem("accessToken") : null
   const isLoggedIn = !!token
 
-  // SWR data fetch
-  const swrKey = useMemo(
-    () => (dealId ? ([`/api/deals/get/${dealId}/comments`, token] as [string, string | null]) : null),
-    [dealId, token],
-  )
-  const { data, error, isLoading, mutate } = useSWR(swrKey, fetcher, {
-    revalidateOnFocus: false,
+  const qc = useQueryClient()
+  const commentsQuery = useQuery({
+    queryKey: ["deal-comments", dealId],
+    enabled: Boolean(dealId && token),
+    queryFn: async () => fetcher(`${BASE_URL}/deals/${dealId}/comments`, token),
   })
 
-  const comments: Comment[] = Array.isArray(data?.data) ? data.data : []
+  const comments: Comment[] = Array.isArray(commentsQuery.data) ? commentsQuery.data : []
 
   // Local state for actions
   const [newComment, setNewComment] = useState("")
@@ -89,9 +89,7 @@ export default function DealComments({ dealId }: DealCommentsProps) {
     ]
 
     try {
-      await mutate(
-        async () => {
-          const res = await fetch(`/api/deals/get/${dealId}/comments`, {
+      const res = await fetch(`${BASE_URL}/deals/${dealId}/comments`, {
             method: "POST",
             headers: {
               Authorization: token ? `Bearer ${token}` : "",
@@ -100,14 +98,11 @@ export default function DealComments({ dealId }: DealCommentsProps) {
             },
             body: JSON.stringify({ commentText: text }),
           })
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}))
-            throw new Error(err.error || "Failed to add comment")
-          }
-          return res.json()
-        },
-        { optimisticData: { data: optimistic }, rollbackOnError: true, revalidate: true },
-      )
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || "Failed to add comment")
+      }
+      await qc.invalidateQueries({ queryKey: ["deal-comments", dealId] })
       setNewComment("")
     } catch (err: any) {
       setAddError(err.message || "Could not add comment")
@@ -121,28 +116,20 @@ export default function DealComments({ dealId }: DealCommentsProps) {
     setDeletingId(commentId)
     setDeleteError(null)
 
-    const remaining = comments.filter((c) => c.id !== commentId)
-
     try {
-      await mutate(
-        async () => {
-          const res = await fetch(`/api/deals/get/${dealId}/comments`, {
-            method: "DELETE",
-            headers: {
-              Authorization: token ? `Bearer ${token}` : "",
-              "Content-Type": "application/json",
-              Accept: "application/json",
-            },
-            body: JSON.stringify({ commentId }),
-          })
-          if (!res.ok) {
-            const err = await res.json().catch(() => ({}))
-            throw new Error(err.error || "Failed to delete comment")
-          }
-          return res.json()
+      const res = await fetch(`${BASE_URL}/deals/${dealId}/comments/${commentId}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: token ? `Bearer ${token}` : "",
+          "Content-Type": "application/json",
+          Accept: "application/json",
         },
-        { optimisticData: { data: remaining }, rollbackOnError: true, revalidate: true },
-      )
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || "Failed to delete comment")
+      }
+      await qc.invalidateQueries({ queryKey: ["deal-comments", dealId] })
     } catch (err: any) {
       setDeleteError(err.message || "Could not delete comment")
     } finally {
@@ -151,7 +138,7 @@ export default function DealComments({ dealId }: DealCommentsProps) {
   }
 
   // UI
-  if (isLoading) {
+  if (commentsQuery.isLoading) {
     return (
       <section aria-busy="true" className="rounded-2xl border bg-card text-card-foreground p-6">
         <h3 className="text-base font-semibold mb-4 text-pretty">Comments</h3>
@@ -160,12 +147,12 @@ export default function DealComments({ dealId }: DealCommentsProps) {
     )
   }
 
-  if (error) {
+  if (commentsQuery.error) {
     return (
       <section className="rounded-2xl border bg-card text-card-foreground p-6">
         <h3 className="text-base font-semibold mb-4 text-pretty">Comments</h3>
         <p role="alert" className="text-sm text-destructive">
-          {(error as Error).message || "Failed to load comments"}
+          {(commentsQuery.error as Error).message || "Failed to load comments"}
         </p>
       </section>
     )

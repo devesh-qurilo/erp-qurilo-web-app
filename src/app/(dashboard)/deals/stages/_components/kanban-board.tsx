@@ -250,6 +250,17 @@ export default function KanbanBoard({
     };
   };
 
+  const normalizePriorityResponse = (
+    payload: any,
+    dealId: string | number,
+    priorityId: number,
+  ) => ({
+    id: payload.id,
+    name: payload.status ?? String(payload.status ?? priorityId),
+    color: payload.color ?? "#2563EB",
+    dealId: payload.dealId ?? dealId,
+  });
+
   const assignPriorityToDeal = async (
     dealId: string | number,
     priorityId: number,
@@ -269,16 +280,10 @@ export default function KanbanBoard({
       const text = await safeReadResponseText(res);
       throw new Error(`Failed to assign priority: ${res.status} ${text}`);
     }
-    const created = await res.json();
-    return {
-      id: created.id,
-      name: created.status ?? String(created.status ?? priorityId),
-      color: created.color ?? "#2563EB",
-      dealId: created.dealId ?? dealId,
-    };
+    return normalizePriorityResponse(await res.json(), dealId, priorityId);
   };
 
-  const updatePriorityForDealFallback = async (
+  const updatePriorityForDeal = async (
     dealId: string | number,
     priorityId: number,
   ) => {
@@ -294,15 +299,31 @@ export default function KanbanBoard({
     });
     if (!res.ok) {
       const text = await safeReadResponseText(res);
-      throw new Error(`Failed fallback PUT update: ${res.status} ${text}`);
+      throw new Error(`Failed priority update: ${res.status} ${text}`);
     }
-    const created = await res.json();
-    return {
-      id: created.id,
-      name: created.status ?? String(created.status ?? priorityId),
-      color: created.color ?? "#2563EB",
-      dealId: created.dealId ?? dealId,
-    };
+    return normalizePriorityResponse(await res.json(), dealId, priorityId);
+  };
+
+  const persistPriorityForDeal = async (
+    dealId: string | number,
+    priorityId: number,
+    hasExistingPriority: boolean,
+  ) => {
+    if (hasExistingPriority) {
+      try {
+        return await updatePriorityForDeal(dealId, priorityId);
+      } catch (updateErr) {
+        console.error("Priority update failed, attempting assign fallback:", updateErr);
+        return await assignPriorityToDeal(dealId, priorityId);
+      }
+    }
+
+    try {
+      return await assignPriorityToDeal(dealId, priorityId);
+    } catch (assignErr) {
+      console.error("Priority assign failed, attempting update fallback:", assignErr);
+      return await updatePriorityForDeal(dealId, priorityId);
+    }
   };
 
   async function safeReadResponseText(res: Response) {
@@ -324,82 +345,31 @@ export default function KanbanBoard({
     name: string,
     color: string,
     dealId: string | number,
+    hasExistingPriority: boolean,
     existingId?: number,
   ) => {
-    if (existingId) {
-      try {
-        const assigned = await assignPriorityToDeal(dealId, existingId);
-        setGlobalPalette((prev) =>
-          dedupePalette([
-            ...prev,
-            { id: assigned.id, name: assigned.name, color: assigned.color },
-          ]),
-        );
-        return assigned;
-      } catch (assignErr) {
-        console.error(
-          "Assign failed, attempting fallback. Assign error:",
-          assignErr,
-        );
-        try {
-          const fallback = await updatePriorityForDealFallback(
-            dealId,
-            existingId,
-          );
-          setGlobalPalette((prev) =>
-            dedupePalette([
-              ...prev,
-              { id: fallback.id, name: fallback.name, color: fallback.color },
-            ]),
-          );
-          return fallback;
-        } catch (fallbackErr) {
-          console.error("Fallback PUT failed:", fallbackErr);
-          throw fallbackErr;
-        }
-      }
-    }
-
     try {
-      const createdGlobal = await createGlobalPriority(name, color);
-      setGlobalPalette((prev) => dedupePalette([...prev, createdGlobal]));
-      try {
-        const assigned = await assignPriorityToDeal(
-          dealId,
-          createdGlobal.id as number,
-        );
+      const priorityId = existingId ?? (await createGlobalPriority(name, color)).id;
+      if (!existingId) {
         setGlobalPalette((prev) =>
-          dedupePalette([
-            ...prev,
-            { id: assigned.id, name: assigned.name, color: assigned.color },
-          ]),
+          dedupePalette([...prev, { id: priorityId, name, color }]),
         );
-        return assigned;
-      } catch (assignErr) {
-        console.error(
-          "Assign after create failed, attempting fallback. Assign error:",
-          assignErr,
-        );
-        try {
-          const fallback = await updatePriorityForDealFallback(
-            dealId,
-            createdGlobal.id as number,
-          );
-          setGlobalPalette((prev) =>
-            dedupePalette([
-              ...prev,
-              { id: fallback.id, name: fallback.name, color: fallback.color },
-            ]),
-          );
-          return fallback;
-        } catch (fallbackErr) {
-          console.error("Fallback PUT failed after create:", fallbackErr);
-          throw fallbackErr;
-        }
       }
-    } catch (createErr) {
-      console.error("Create global priority failed:", createErr);
-      throw createErr;
+      const assigned = await persistPriorityForDeal(
+        dealId,
+        priorityId as number,
+        hasExistingPriority,
+      );
+      setGlobalPalette((prev) =>
+        dedupePalette([
+          ...prev,
+          { id: assigned.id, name: assigned.name, color: assigned.color },
+        ]),
+      );
+      return assigned;
+    } catch (err) {
+      console.error("Could not save/assign priority", err);
+      throw err;
     }
   };
 
@@ -774,13 +744,32 @@ function DealCard({
 
   const dealName = deal.title ?? "Deal";
 
-  const initialTags: string[] = Array.isArray((deal as any).tags)
-    ? (deal as any).tags
-    : (deal as any).tags
-      ? String((deal as any).tags)
-        .split(",")
-        .map((s: string) => s.trim())
-      : [];
+  const parseTagNames = (raw: any): string[] => {
+    if (!raw) return [];
+    if (Array.isArray(raw)) {
+      return raw
+        .map((tag) => {
+          if (!tag) return "";
+          if (typeof tag === "string") return tag;
+          if (typeof tag === "object") {
+            return String(tag.tagName ?? tag.name ?? tag.label ?? "");
+          }
+          return String(tag);
+        })
+        .map((tag) => tag.trim())
+        .filter(Boolean);
+    }
+    if (typeof raw === "object") {
+      const single = String(raw.tagName ?? raw.name ?? raw.label ?? "");
+      return single ? [single.trim()] : [];
+    }
+    return String(raw)
+      .split(",")
+      .map((s: string) => s.trim())
+      .filter(Boolean);
+  };
+
+  const initialTags: string[] = parseTagNames((deal as any).tags);
 
   // ---- COMMENTS ----
   const initialCommentsRaw =
@@ -968,15 +957,7 @@ function DealCard({
 
   // --- NEW: Sync incoming deal props into local card state so Kanban shows same people/tags/comments/followup-created as Deal -> People view
   useEffect(() => {
-    setLocalTags(
-      Array.isArray((deal as any).tags)
-        ? (deal as any).tags
-        : (deal as any).tags
-          ? String((deal as any).tags)
-            .split(",")
-            .map((s: string) => s.trim())
-          : [],
-    );
+    setLocalTags(parseTagNames((deal as any).tags));
 
     const watchersSource =
       (deal as any).assignedEmployeesMeta ??
@@ -1120,6 +1101,7 @@ function DealCard({
         p.name,
         p.color,
         (deal as any).id,
+        priorities.length > 0,
         p.id,
       );
 
@@ -1187,6 +1169,7 @@ function DealCard({
         modalPriorityName.trim(),
         modalPriorityColor || "#000000",
         (deal as any).id,
+        priorities.length > 0,
       );
       setPriorities([{ name: assigned.name, color: assigned.color }]);
       setOpenModal(false);

@@ -29,7 +29,7 @@ export default function LoginPage() {
         {
           employeeId,
           password,
-        }
+        },
       );
       const data = resp.data;
 
@@ -44,7 +44,7 @@ export default function LoginPage() {
       else router.push("/employees/employee");
     } catch (err) {
       setError(
-        err instanceof Error ? err.message : "An error occurred during login"
+        err instanceof Error ? err.message : "An error occurred during login",
       );
     } finally {
       setIsLoading(false);
@@ -57,7 +57,7 @@ export default function LoginPage() {
         <CardContent className="p-8 space-y-6">
           <div className="text-center space-y-2">
             <h1 className="text-3xl font-bold text-white tracking-wide drop-shadow-sm">
-              SKAVO ERP
+              Qurilo ERP
             </h1>
             <p className="text-white/80 text-sm">
               Sign in to continue to your dashboard
@@ -126,7 +126,7 @@ export default function LoginPage() {
           </form>
 
           <p className="text-center text-xs text-white/70">
-            © {new Date().getFullYear()} SKAVO — All Rights Reserved
+            © {new Date().getFullYear()} Qurilo — All Rights Reserved
           </p>
         </CardContent>
       </Card>

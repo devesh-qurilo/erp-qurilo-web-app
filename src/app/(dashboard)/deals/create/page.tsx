@@ -1,26 +1,22 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Stage } from "@/types/stages";
+import {
+  useCreateDealMutation,
+  useDealCategoriesQuery,
+  useDealEmployeesQuery,
+  useDealLeadOptionsQuery,
+  useStagesQuery,
+  type DealCategoryItem,
+} from "../api";
 
 
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 
 
-type Employee = {
-  employeeId: string;
-  name: string;
-};
-
-type Lead = {
-  id: number;
-  name: string;
-  email?: string | null;
-  companyName?: string | null;
-};
 
 export default function CreateDealPage() {
   const router = useRouter();
@@ -37,83 +33,41 @@ export default function CreateDealPage() {
     dealContact: "",
   });
 
-  const [employees, setEmployees] = useState<Employee[]>([]);
-  const [stages, setStages] = useState<Stage[]>([]);
-  const [leads, setLeads] = useState<Lead[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [stagesLoading, setStagesLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-
-  // NEW: categories state + modal flag
-  const [categories, setCategories] = useState<string[]>(["General", "Corporate", "Retail"]);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [newCategoryInput, setNewCategoryInput] = useState("");
+  const [categorySaving, setCategorySaving] = useState(false);
 
-  const API_BASE = `${process.env.NEXT_PUBLIC_MAIN}`;
+  const { data: employees = [], isLoading: employeesLoading, error: employeesError } = useDealEmployeesQuery();
+  const { data: stages = [], isLoading: stagesLoading, error: stagesError } = useStagesQuery();
+  const { data: leads = [], isLoading: leadsLoading, error: leadsError } = useDealLeadOptionsQuery();
+  const { data: categoryItems = [], isLoading: categoriesLoading, error: categoriesError, refetch: refetchCategories } = useDealCategoriesQuery();
+  const createDealMutation = useCreateDealMutation({
+    onSuccess: async () => {
+      setSuccess("Deal created successfully!");
+      setTimeout(() => router.push("/deals/get"), 1000);
+    },
+  });
+  const loading = createDealMutation.isPending;
+  const combinedError = employeesError || stagesError || leadsError || categoriesError;
+  const initialLoading = employeesLoading || stagesLoading || leadsLoading || categoriesLoading;
+  const categories = useMemo(
+    () => categoryItems.map((item: DealCategoryItem) => item.categoryName || item.name || "").filter(Boolean),
+    [categoryItems],
+  );
 
-  // Fetch employees, stages and leads
   useEffect(() => {
-    const fetchEmployeesStagesLeads = async () => {
-      try {
-        const token = localStorage.getItem("accessToken");
-        if (!token) {
-          setError("No access token found. Please log in.");
-          return;
-        }
+    if (!formData.dealStage && stages.length > 0) {
+      setFormData((prev) => ({ ...prev, dealStage: stages[0].name }));
+    }
+  }, [formData.dealStage, stages]);
 
-        // Fetch employees
-        const empRes = await fetch("/api/hr/employee", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!empRes.ok) throw new Error("Failed to fetch employees");
-        const empData = await empRes.json();
-        setEmployees(empData.content || []);
-
-        // Fetch stages
-        const stageRes = await fetch("/api/deals/stages", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        // if (!stageRes.ok) throw new Error("Failed to fetch deal stages");
-
-
-        if (!stageRes.ok) {
-          const text = await stageRes.text();
-          console.error("Stages API error:", stageRes.status, text);
-          throw new Error(`Failed to fetch deal stages (${stageRes.status})`);
-        }
-
-
-
-        const stageData: Stage[] = await stageRes.json();
-        setStages(stageData);
-        if (stageData.length > 0) {
-          setFormData((prev) => ({ ...prev, dealStage: stageData[0].name }));
-        }
-
-        // Fetch leads from provided base URL
-        const leadsRes = await fetch(`${API_BASE}/leads`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (!leadsRes.ok) {
-          // do not fail the whole form if leads endpoint fails — set empty leads and continue
-          console.warn("Failed to fetch leads for dropdown");
-          setLeads([]);
-        } else {
-          const leadsData = await leadsRes.json();
-          // Expecting array as you provided; map to Lead[]
-          setLeads(Array.isArray(leadsData) ? leadsData : []);
-        }
-      } catch (err) {
-        console.error(err);
-        setError("Failed to load data. Please try again later.");
-      } finally {
-        setStagesLoading(false);
-      }
-    };
-
-    fetchEmployeesStagesLeads();
-  }, []);
+  useEffect(() => {
+    if (combinedError) {
+      setError(combinedError.message || "Failed to load data. Please try again later.");
+    }
+  }, [combinedError]);
 
   const handleInputChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
@@ -132,7 +86,6 @@ export default function CreateDealPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError(null);
     setSuccess(null);
 
@@ -146,7 +99,6 @@ export default function CreateDealPage() {
       !formData.expectedCloseDate
     ) {
       setError("Please fill all required fields.");
-      setLoading(false);
       return;
     }
 
@@ -154,7 +106,6 @@ export default function CreateDealPage() {
       const token = localStorage.getItem("accessToken");
       if (!token) {
         setError("No access token found. Please log in.");
-        setLoading(false);
         return;
       }
 
@@ -171,29 +122,14 @@ export default function CreateDealPage() {
         dealContact: formData.dealContact,
       };
 
-      const res = await fetch("/api/deals/create", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!res.ok) throw new Error("Failed to create deal");
-
-      setSuccess("Deal created successfully!");
-      // keep same behavior: redirect to deals listing after success
-      setTimeout(() => router.push("/deals/get"), 1000);
+      await createDealMutation.mutateAsync(payload);
     } catch (err) {
       console.error(err);
-      setError("Failed to create deal. Please try again.");
-    } finally {
-      setLoading(false);
+      setError(err instanceof Error ? err.message : "Failed to create deal. Please try again.");
     }
   };
 
-  // if (stagesLoading) {
+  // if (initialLoading) {
   //   return (
   //     <div className="flex justify-center items-center min-h-screen text-lg font-semibold">
   //       Loading form...
@@ -203,7 +139,7 @@ export default function CreateDealPage() {
 
 
 
-  if (stagesLoading) {
+  if (initialLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-start justify-center py-10 px-4">
         <div className="w-full max-w-4xl space-y-6">
@@ -265,25 +201,47 @@ export default function CreateDealPage() {
     setNewCategoryInput("");
   };
 
-  const saveCategory = () => {
+  const saveCategory = async () => {
+    const token = localStorage.getItem("accessToken");
     const name = newCategoryInput.trim();
-    if (!name) return;
-    // avoid duplicates
-    if (!categories.includes(name)) {
-      setCategories((prev) => [...prev, name]);
-      setFormData((prev) => ({ ...prev, dealCategory: name })); // set selected category to new one
-    } else {
-      // if exists, just select it
+    if (!name || !token) return;
+    setCategorySaving(true);
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_MAIN}/deals/dealCategory`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ categoryName: name }),
+      });
+      await refetchCategories();
       setFormData((prev) => ({ ...prev, dealCategory: name }));
+      closeCategoryModal();
+    } catch (err) {
+      console.error(err);
+      setError("Failed to save deal category.");
+    } finally {
+      setCategorySaving(false);
     }
-    closeCategoryModal();
   };
 
-  const deleteCategory = (name: string) => {
+  const deleteCategory = async (name: string) => {
     if (!confirm(`Delete category "${name}"?`)) return;
-    setCategories((prev) => prev.filter((c) => c !== name));
-    // if the deleted category was selected, clear selection
-    setFormData((prev) => (prev.dealCategory === name ? { ...prev, dealCategory: "" } : prev));
+    const token = localStorage.getItem("accessToken");
+    const item = categoryItems.find((entry) => (entry.categoryName || entry.name) === name);
+    if (!token || !item?.id) return;
+    try {
+      await fetch(`${process.env.NEXT_PUBLIC_MAIN}/deals/dealCategory/${item.id}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      await refetchCategories();
+      setFormData((prev) => (prev.dealCategory === name ? { ...prev, dealCategory: "" } : prev));
+    } catch (err) {
+      console.error(err);
+      setError("Failed to delete deal category.");
+    }
   };
   // --------------------------------------------------
 
@@ -517,7 +475,7 @@ export default function CreateDealPage() {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || categorySaving}
               className={`px-6 py-2 rounded-full text-white ${loading ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"}`}
             >
               {loading ? "Creating..." : "Create"}
@@ -593,7 +551,7 @@ export default function CreateDealPage() {
 
               <div className="mt-4 flex justify-end gap-3">
                 <button onClick={closeCategoryModal} className="px-4 py-2 border rounded-md">Cancel</button>
-                <button onClick={saveCategory} className="px-4 py-2 bg-blue-600 text-white rounded-md">Save</button>
+                <button onClick={() => void saveCategory()} className="px-4 py-2 bg-blue-600 text-white rounded-md">Save</button>
               </div>
             </div>
           </div>

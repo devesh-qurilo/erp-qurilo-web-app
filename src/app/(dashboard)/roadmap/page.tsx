@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState } from "react";
@@ -42,7 +41,7 @@ const projects: Project[] = Array.from({ length: 20 }, (_, i) => ({
   deadline: i % 5 === 0 ? "22/08/2025" : "02/10/2025",
   client: {
     name: "John Doe",
-    company: "Skavo LLC",
+    company: "Qurilo LLC",
     avatar: "https://i.pravatar.cc/40?img=4",
   },
   status: "In Progress",
@@ -188,10 +187,11 @@ export default function RoadmapPage() {
                 </td>
                 <td className="p-3">{p.startDate}</td>
                 <td
-                  className={`p-3 ${p.deadline === "22/08/2025"
-                    ? "text-red-500 font-semibold"
-                    : ""
-                    }`}
+                  className={`p-3 ${
+                    p.deadline === "22/08/2025"
+                      ? "text-red-500 font-semibold"
+                      : ""
+                  }`}
                 >
                   {p.deadline}
                 </td>
@@ -212,12 +212,13 @@ export default function RoadmapPage() {
                   <div className="flex items-center gap-2">
                     <div className="w-20 bg-gray-200 h-2 rounded-full overflow-hidden">
                       <div
-                        className={`h-2 rounded-full ${p.progress === 100
-                          ? "bg-green-500"
-                          : p.progress > 0
-                            ? "bg-yellow-400"
-                            : "bg-gray-400"
-                          }`}
+                        className={`h-2 rounded-full ${
+                          p.progress === 100
+                            ? "bg-green-500"
+                            : p.progress > 0
+                              ? "bg-yellow-400"
+                              : "bg-gray-400"
+                        }`}
                         style={{ width: `${p.progress}%` }}
                       />
                     </div>
