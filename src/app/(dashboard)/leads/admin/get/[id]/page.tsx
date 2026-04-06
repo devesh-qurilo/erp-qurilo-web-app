@@ -14,7 +14,13 @@ import { createPortal } from "react-dom";
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
 
-import { useConvertLeadMutation, useDeleteLeadMutation, useLeadDealsQuery, useLeadDetailQuery, useLeadEmployeesQuery } from "../../api";
+import {
+  useConvertLeadMutation,
+  useDeleteLeadMutation,
+  useLeadDealsQuery,
+  useLeadDetailQuery,
+  useLeadEmployeesQuery,
+} from "../../api";
 
 type EmployeeMeta = {
   employeeId?: string;
@@ -130,15 +136,15 @@ function fmt(v?: string | null) {
   return v && v !== "null" ? v : "--";
 }
 function fmtDate(d?: string | null) {
-  return d ?
-    // new Date(d).toLocaleString()
-    format(new Date(d), "dd-MM-yyyy HH:mm")
+  return d
+    ? // new Date(d).toLocaleString()
+      format(new Date(d), "dd-MM-yyyy HH:mm")
     : "--";
 }
 function fmtShortDate(d?: string | null) {
-  return d ?
-    // new Date(d).toLocaleDateString() 
-    format(new Date(d), "dd-MM-yyyy")
+  return d
+    ? // new Date(d).toLocaleDateString()
+      format(new Date(d), "dd-MM-yyyy")
     : "--";
 }
 function fmtCurrency(n?: number | null) {
@@ -238,11 +244,7 @@ function DealViewModal({
   return (
     <div className="fixed inset-0 z-50">
       <div className="absolute inset-0 bg-black/30" onClick={onClose} />
-      <div className="fixed inset-0 flex items-start justify-center px-4 pt-8">
-
-      </div>
-
-
+      <div className="fixed inset-0 flex items-start justify-center px-4 pt-8"></div>
     </div>
   );
 }
@@ -334,10 +336,7 @@ function DealCategoryModal({
           className="max-w-3xl w-full bg-white rounded-lg shadow-lg border overflow-auto"
           style={{ maxHeight: "80vh" }}
         > */}
-        <div
-          className="w-[83%] h-full bg-white shadow-xl overflow-y-auto flex flex-col"
-        >
-
+        <div className="w-[83%] h-full bg-white shadow-xl overflow-y-auto flex flex-col">
           <div className="flex items-center justify-between p-4 border-b">
             <h3 className="text-lg font-semibold">Deal Category</h3>
             <button
@@ -458,11 +457,8 @@ function AddDealModal({
   possibleAgents: EmployeeMeta[];
   possibleWatchers: EmployeeMeta[];
 }) {
-
-
   const [employees, setEmployees] = useState<EmployeeMeta[]>([]);
   const [employeesLoading, setEmployeesLoading] = useState(true);
-
 
   const [form, setForm] = useState({
     leadContact: lead?.id ?? "",
@@ -476,13 +472,8 @@ function AddDealModal({
     closeDate: "",
   });
 
-
-
-
-
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
 
   useEffect(() => {
     const fetchEmployees = async () => {
@@ -508,8 +499,6 @@ function AddDealModal({
 
     fetchEmployees();
   }, []);
-
-
 
   const [watchersOpen, setWatchersOpen] = useState(false);
   const watchersButtonRef = useRef<HTMLButtonElement | null>(null);
@@ -644,7 +633,6 @@ function AddDealModal({
     setWatchersOpen((s) => !s);
   };
 
-
   const selectedWatcherNames = () => {
     if (form.dealWatchers.length === 0) return "--";
 
@@ -653,9 +641,6 @@ function AddDealModal({
       .map((e) => e.name)
       .join(", ");
   };
-
-
-
 
   return (
     <div className="fixed inset-0 z-50">
@@ -667,10 +652,7 @@ function AddDealModal({
           style={{ maxHeight: "92vh" }}
         > */}
 
-        <div
-          className="w-[83%] h-full bg-white shadow-xl overflow-y-auto flex flex-col"
-        >
-
+        <div className="w-[83%] h-full bg-white shadow-xl overflow-y-auto flex flex-col">
           <div className="flex items-center justify-between p-4 border-b">
             <h3 className="text-lg font-semibold">Add Deal Information</h3>
             <button
@@ -740,10 +722,16 @@ function AddDealModal({
                     <option value="">--</option>
                     <option value="Default Pipeline">Default Pipeline</option>
                     <option value="Sales Pipeline">Sales Pipeline</option>
-                    <option value="Enterprise Pipeline">Enterprise Pipeline</option>
-                    <option value="Client Success Pipeline">Client Success Pipeline</option>
+                    <option value="Enterprise Pipeline">
+                      Enterprise Pipeline
+                    </option>
+                    <option value="Client Success Pipeline">
+                      Client Success Pipeline
+                    </option>
                     <option value="Finance Pipeline">Finance Pipeline</option>
-                    <option value="Marketing Pipeline">Marketing Pipeline</option>
+                    <option value="Marketing Pipeline">
+                      Marketing Pipeline
+                    </option>
                   </select>
                 </div>
 
@@ -817,9 +805,6 @@ function AddDealModal({
                       ))
                     )}
                   </select>
-
-
-
                 </div>
 
                 <div>
@@ -856,7 +841,6 @@ function AddDealModal({
                     Deal Watcher
                   </label>
 
-
                   {/* Dropdown button */}
                   <button
                     type="button"
@@ -879,8 +863,6 @@ function AddDealModal({
                     </svg>
                   </button>
 
-
-
                   {/* Dropdown panel */}
                   {watchersOpen && (
                     <div className="absolute z-50 mt-2 w-full bg-white border rounded-md shadow-lg p-3 max-h-60 overflow-auto">
@@ -902,9 +884,14 @@ function AddDealModal({
                               <input
                                 type="checkbox"
                                 className="mt-1"
-                                checked={form.dealWatchers.includes(emp.employeeId)}
+                                checked={form.dealWatchers.includes(
+                                  emp.employeeId,
+                                )}
                                 onChange={(e) =>
-                                  toggleWatcher(emp.employeeId, e.target.checked)
+                                  toggleWatcher(
+                                    emp.employeeId,
+                                    e.target.checked,
+                                  )
                                 }
                               />
                               <span>{emp.name}</span>
@@ -919,9 +906,6 @@ function AddDealModal({
                     Select one or more watchers
                   </div>
                 </div>
-
-
-
               </div>
             </div>
 
@@ -1078,10 +1062,7 @@ function EditModal({
           style={{ maxHeight: "92vh" }}
         > */}
 
-        <div
-          className="w-[83%] h-full bg-white shadow-xl overflow-y-auto flex flex-col"
-        >
-
+        <div className="w-[83%] h-full bg-white shadow-xl overflow-y-auto flex flex-col">
           <div className="flex items-center justify-between p-4 border-b">
             <h3 className="text-lg font-semibold">Update Lead Contact</h3>
             <button
@@ -1375,10 +1356,7 @@ function AddEditNoteModal({
           style={{ maxHeight: "90vh" }}
         > */}
 
-        <div
-          className="w-[83%] h-full bg-white shadow-xl overflow-y-auto flex flex-col"
-        >
-
+        <div className="w-[83%] h-full bg-white shadow-xl overflow-y-auto flex flex-col">
           <div className="flex items-center justify-between p-4 border-b">
             <h3 className="text-lg font-semibold">
               {isEdit ? "Edit Lead Note" : "Add Lead Note"}
@@ -1498,10 +1476,7 @@ function ViewNoteModal({ note, onClose }: { note: Note; onClose: () => void }) {
           style={{ maxHeight: "90vh" }}
         > */}
 
-        <div
-          className="w-[83%] h-full bg-white shadow-xl overflow-y-auto flex flex-col"
-        >
-
+        <div className="w-[83%] h-full bg-white shadow-xl overflow-y-auto flex flex-col">
           <div className="flex items-center justify-between p-4 border-b">
             <h3 className="text-lg font-semibold">
               {note.noteTitle ?? "My Note"}
@@ -1578,15 +1553,14 @@ export default function LeadDetailPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
-
   const [openDealMenuId, setOpenDealMenuId] = useState<number | null>(null);
-  const [dealMenuPos, setDealMenuPos] = useState<{ top: number; left: number } | null>(null);
+  const [dealMenuPos, setDealMenuPos] = useState<{
+    top: number;
+    left: number;
+  } | null>(null);
   const dealMenuRef = useRef<HTMLDivElement | null>(null);
 
-  const handleDealMenuOpen = (
-    e: React.MouseEvent,
-    dealId: number
-  ) => {
+  const handleDealMenuOpen = (e: React.MouseEvent, dealId: number) => {
     e.stopPropagation();
 
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
@@ -1597,7 +1571,6 @@ export default function LeadDetailPage() {
       left: rect.right - 160,
     });
   };
-
 
   //   if (openDealMenuId == null) return;
 
@@ -1624,9 +1597,6 @@ export default function LeadDetailPage() {
   //     document.removeEventListener("keydown", handleEscape);
   //   };
   // }, [openDealMenuId]);
-
-
-
 
   useEffect(() => {
     if (!openDealMenuId) return;
@@ -1657,18 +1627,18 @@ export default function LeadDetailPage() {
     };
   }, [openDealMenuId]);
 
-
   const [editOpen, setEditOpen] = useState(false);
 
-  const dealsQuery = useLeadDealsQuery(String(params.id), activeTab === "deals");
+  const dealsQuery = useLeadDealsQuery(
+    String(params.id),
+    activeTab === "deals",
+  );
   const dealsData = dealsQuery.data as Deal[] | undefined;
   const dealsError = dealsQuery.error;
   const dealsLoading = dealsQuery.isLoading;
   const mutateDeals = async () => {
     await dealsQuery.refetch();
   };
-
-
 
   const [selectedPipeline, setSelectedPipeline] = useState<string>("All");
 
@@ -1677,15 +1647,21 @@ export default function LeadDetailPage() {
     return deal.pipeline === selectedPipeline;
   });
 
+  console.log("lead filter details", filteredDeals);
 
-  const employeesQuery = useLeadEmployeesQuery({ refetchOnWindowFocus: false, staleTime: 60 * 1000 });
-  const employees: EmployeeMeta[] = (employeesQuery.data ?? []).map((employee) => ({
-    employeeId: employee.employeeId,
-    name: employee.name,
-    designation: employee.designationName ?? null,
-    department: employee.departmentName ?? null,
-    profileUrl: employee.profilePictureUrl ?? null,
-  }));
+  const employeesQuery = useLeadEmployeesQuery({
+    refetchOnWindowFocus: false,
+    staleTime: 60 * 1000,
+  });
+  const employees: EmployeeMeta[] = (employeesQuery.data ?? []).map(
+    (employee) => ({
+      employeeId: employee.employeeId,
+      name: employee.name,
+      designation: employee.designationName ?? null,
+      department: employee.departmentName ?? null,
+      profileUrl: employee.profilePictureUrl ?? null,
+    }),
+  );
 
   const [addDealOpen, setAddDealOpen] = useState(false);
 
@@ -1707,8 +1683,6 @@ export default function LeadDetailPage() {
     setMenuOpen(false);
     router.push(`/leads/admin/edit/${params.id}`);
   };
-
-
 
   const convertToClient = async () => {
     setMenuOpen(false);
@@ -1830,7 +1804,6 @@ export default function LeadDetailPage() {
     }
   };
 
-
   const onOpenNoteMenu = (e: React.MouseEvent, noteId?: number) => {
     e.stopPropagation();
     if (!noteId) return;
@@ -1847,7 +1820,6 @@ export default function LeadDetailPage() {
       left: Math.max(left, 8),
     });
   };
-
 
   useEffect(() => {
     if (openNoteMenuId == null) return;
@@ -1878,8 +1850,6 @@ export default function LeadDetailPage() {
     };
   }, [openNoteMenuId]);
 
-
-
   return (
     <main className="min-h-screen bg-gray-50">
       <div className="container mx-auto max-w-6xl  px-4 py-8">
@@ -1890,11 +1860,8 @@ export default function LeadDetailPage() {
             size="icon"
             onClick={() => router.back()}
             aria-label="Back"
-          >
-          </Button>
-          <div>
-
-          </div>
+          ></Button>
+          <div></div>
         </div>
 
         {/* Tabs */}
@@ -1929,11 +1896,8 @@ export default function LeadDetailPage() {
             </div>
           ) : error ? ( */}
 
-
-
           {isLoading ? (
             <div className="space-y-6">
-
               {/* Title */}
               <Skeleton height={25} width={200} />
 
@@ -1949,13 +1913,8 @@ export default function LeadDetailPage() {
                 <Skeleton width={200} />
                 <Skeleton width={120} />
               </div>
-
             </div>
           ) : error ? (
-
-
-
-
             <div className="py-12 text-center">
               <p className="text-destructive">Failed to load lead details.</p>
               <p className="text-sm text-muted-foreground mt-2">
@@ -2064,14 +2023,18 @@ export default function LeadDetailPage() {
                             <div className="w-48 md:hidden text-sm text-muted-foreground">
                               Name
                             </div>
-                            <div className="text-sm mt-2">{fmt(data?.name)}</div>
+                            <div className="text-sm mt-2">
+                              {fmt(data?.name)}
+                            </div>
                           </div>
 
                           <div className="flex items-start gap-6">
                             <div className="w-48 md:hidden text-sm text-muted-foreground">
                               Email
                             </div>
-                            <div className="text-sm mt-2">{fmt(data?.email)}</div>
+                            <div className="text-sm mt-2">
+                              {fmt(data?.email)}
+                            </div>
                           </div>
 
                           <div className="flex items-start gap-6">
@@ -2205,22 +2168,29 @@ export default function LeadDetailPage() {
                           <option>Default Pipeline </option>
                         </select> */}
 
-
-
                         <select
                           value={selectedPipeline}
                           onChange={(e) => setSelectedPipeline(e.target.value)}
                           className="border rounded p-2 text-sm"
                         >
                           <option value="All">All</option>
-                          <option value="Default Pipeline">Default Pipeline</option>
+                          <option value="Default Pipeline">
+                            Default Pipeline
+                          </option>
                           <option value="Sales Pipeline">Sales Pipeline</option>
-                          <option value="Enterprise Pipeline">Enterprise Pipeline</option>
-                          <option value="Client Success Pipeline">Client Success Pipeline</option>
-                          <option value="Finance Pipeline">Finance Pipeline</option>
-                          <option value="Marketing Pipeline">Marketing Pipeline</option>
+                          <option value="Enterprise Pipeline">
+                            Enterprise Pipeline
+                          </option>
+                          <option value="Client Success Pipeline">
+                            Client Success Pipeline
+                          </option>
+                          <option value="Finance Pipeline">
+                            Finance Pipeline
+                          </option>
+                          <option value="Marketing Pipeline">
+                            Marketing Pipeline
+                          </option>
                         </select>
-
                       </div>
                     </div>
 
@@ -2257,8 +2227,6 @@ export default function LeadDetailPage() {
                             </td>
                           </tr> */}
 
-
-
                         {dealsLoading ? (
                           [...Array(5)].map((_, i) => (
                             <tr key={i}>
@@ -2269,10 +2237,6 @@ export default function LeadDetailPage() {
                               ))}
                             </tr>
                           ))
-
-
-
-
                         ) : dealsError ? (
                           <tr>
                             <td
@@ -2311,7 +2275,7 @@ export default function LeadDetailPage() {
 
                               <td className="px-4 py-3">
                                 <div className="text-xs">
-                                  {fmt(d.leadMobile as any)}
+                                  {data?.mobileNumber as any}
                                 </div>
                                 <div className="text-muted-foreground text-xs">
                                   {(data?.email as string) ?? "--"}
@@ -2353,7 +2317,7 @@ export default function LeadDetailPage() {
 
                               <td className="px-4 py-3">
                                 {d.dealWatchersMeta &&
-                                  d.dealWatchersMeta.length > 0 ? (
+                                d.dealWatchersMeta.length > 0 ? (
                                   <div>
                                     <div className="text-sm">
                                       {d.dealWatchersMeta[0].name}
@@ -2383,8 +2347,6 @@ export default function LeadDetailPage() {
                                 </select>
                               </td> */}
 
-
-
                               <td className="px-4 py-3">
                                 <select
                                   value={d.dealStage ?? "Generated"}
@@ -2392,26 +2354,35 @@ export default function LeadDetailPage() {
                                     const newStage = e.target.value;
 
                                     try {
-                                      const token = localStorage.getItem("accessToken");
-                                      if (!token) throw new Error("No access token.");
+                                      const token =
+                                        localStorage.getItem("accessToken");
+                                      if (!token)
+                                        throw new Error("No access token.");
 
-                                      const res = await fetch(`${BASE}/deals/${d.id}`, {
-                                        method: "PUT", // or PATCH if your API supports it
-                                        headers: {
-                                          Authorization: `Bearer ${token}`,
-                                          "Content-Type": "application/json",
+                                      const res = await fetch(
+                                        `${BASE}/deals/${d.id}`,
+                                        {
+                                          method: "PUT", // or PATCH if your API supports it
+                                          headers: {
+                                            Authorization: `Bearer ${token}`,
+                                            "Content-Type": "application/json",
+                                          },
+                                          body: JSON.stringify({
+                                            dealStage: newStage,
+                                          }),
                                         },
-                                        body: JSON.stringify({
-                                          dealStage: newStage,
-                                        }),
-                                      });
+                                      );
 
-                                      if (!res.ok) throw new Error(await res.text());
+                                      if (!res.ok)
+                                        throw new Error(await res.text());
 
                                       await mutateDeals();
                                       await mutate();
                                     } catch (err: any) {
-                                      alert("Failed to update stage: " + (err?.message ?? err));
+                                      alert(
+                                        "Failed to update stage: " +
+                                          (err?.message ?? err),
+                                      );
                                     }
                                   }}
                                   className="border rounded p-1 text-sm"
@@ -2423,13 +2394,6 @@ export default function LeadDetailPage() {
                                   <option value="LOST">Lost</option>
                                 </select>
                               </td>
-
-
-
-
-
-
-
 
                               <td className="px-4 py-3">
                                 <button
@@ -2448,8 +2412,8 @@ export default function LeadDetailPage() {
                                 </button>
                               </td>
 
-
-                              {openDealMenuId && dealMenuPos &&
+                              {openDealMenuId &&
+                                dealMenuPos &&
                                 createPortal(
                                   <div
                                     ref={dealMenuRef}
@@ -2462,11 +2426,12 @@ export default function LeadDetailPage() {
                                     }}
                                   >
                                     <div className="bg-white border rounded shadow-xl">
-
                                       {/* VIEW */}
                                       <button
                                         onClick={() => {
-                                          router.push(`/deals/get/${openDealMenuId}`);
+                                          router.push(
+                                            `/deals/get/${openDealMenuId}`,
+                                          );
                                           setOpenDealMenuId(null);
                                           setDealMenuPos(null);
                                         }}
@@ -2478,7 +2443,9 @@ export default function LeadDetailPage() {
                                       {/* EDIT */}
                                       <button
                                         onClick={() => {
-                                          router.push(`/deals/create/DealEdit/${openDealMenuId}`);
+                                          router.push(
+                                            `/deals/create/DealEdit/${openDealMenuId}`,
+                                          );
                                           setOpenDealMenuId(null);
                                           setDealMenuPos(null);
                                         }}
@@ -2492,11 +2459,18 @@ export default function LeadDetailPage() {
                                       {/* DELETE */}
                                       <button
                                         onClick={async () => {
-                                          if (!confirm("Delete this deal?")) return;
+                                          if (!confirm("Delete this deal?"))
+                                            return;
 
                                           try {
-                                            const token = localStorage.getItem("accessToken");
-                                            if (!token) throw new Error("No access token.");
+                                            const token =
+                                              localStorage.getItem(
+                                                "accessToken",
+                                              );
+                                            if (!token)
+                                              throw new Error(
+                                                "No access token.",
+                                              );
 
                                             const res = await fetch(
                                               `${BASE}/deals/${openDealMenuId}`,
@@ -2505,14 +2479,17 @@ export default function LeadDetailPage() {
                                                 headers: {
                                                   Authorization: `Bearer ${token}`,
                                                 },
-                                              }
+                                              },
                                             );
 
-                                            if (!res.ok) throw new Error(await res.text());
+                                            if (!res.ok)
+                                              throw new Error(await res.text());
 
                                             await mutateDeals();
                                           } catch (err: any) {
-                                            alert("Error: " + (err?.message ?? err));
+                                            alert(
+                                              "Error: " + (err?.message ?? err),
+                                            );
                                           }
 
                                           setOpenDealMenuId(null);
@@ -2524,14 +2501,8 @@ export default function LeadDetailPage() {
                                       </button>
                                     </div>
                                   </div>,
-                                  document.body
-                                )
-                              }
-
-
-
-
-
+                                  document.body,
+                                )}
                             </tr>
                           ))
                         )}
@@ -2594,7 +2565,6 @@ export default function LeadDetailPage() {
                             </td>
                           </tr> */}
 
-
                         {notesLoading ? (
                           [...Array(5)].map((_, i) => (
                             <tr key={i}>
@@ -2605,9 +2575,6 @@ export default function LeadDetailPage() {
                               ))}
                             </tr>
                           ))
-
-
-
                         ) : notesError ? (
                           <tr>
                             <td
