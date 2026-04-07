@@ -1,67 +1,23 @@
-
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Deal } from "@/types/deals";
-import DealTags from "../../_components/DealTags";
-import CommentForm from "../../_components/comment";
-import { createPortal } from "react-dom";
 import EditFollowupModal from "../../_components/EditFollowupModal";
 import NoteActionModal from "../../_components/NoteActionModal";
 import { format } from "date-fns";
 
-
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
-
-
-type DocumentItem = {
-  id: number;
-  filename: string;
-  url: string;
-  uploadedAt: string;
-};
-
-type Followup = {
-  id?: number;
-  nextDate: string; // yyyy-mm-dd
-  startTime: string; // HH:mm
-  remarks?: string;
-  sendReminder?: boolean;
-  remindBefore?: number;
-  remindUnit?: "DAYS" | "HOURS" | "MINUTES" | string;
-  status?: "PENDING" | "CANCELLED" | "COMPLETED" | string;
-};
-
-type Employee = {
-  employeeId: string;
-  name: string;
-  designation?: string;
-  department?: string;
-  profileUrl?: string;
-};
-
-type NoteItem = {
-  id?: number;
-  noteTitle: string;
-  noteType: "PUBLIC" | "PRIVATE" | string;
-  noteDetails?: string;
-  createdBy?: string;
-  createdAt?: string;
-};
-
-type TagItem = {
-  id?: number;
-  tagName: string;
-};
-
-type TabKey = "files" | "followups" | "people" | "notes" | "comments" | "tags";
+import {
+  type DocumentItem,
+  type DealDetail,
+  type Employee,
+  type NoteItem,
+  useDealDetailStore,
+} from "./store";
 
 const BASE_URL = `${process.env.NEXT_PUBLIC_MAIN}`;
-
-
 
 // Use the uploaded screenshot path as the developer local fallback (infra will transform to a URL)
 const UPLOADED_LOCAL_PATH = "/mnt/data/Screenshot 2025-11-22 120859.png";
@@ -69,97 +25,118 @@ const UPLOADED_LOCAL_PATH = "/mnt/data/Screenshot 2025-11-22 120859.png";
 export default function DealDetailPage() {
   const params = useParams();
   const dealId = params?.id as string;
-
-  const menuRef = useRef<HTMLDivElement | null>(null);
-
-
-  const [deal, setDeal] = useState<Deal | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabKey>("files");
-
-  // documents state & employees who can access the docs
-  const [documents, setDocuments] = useState<DocumentItem[]>([]);
-  const [docEmployeeIds, setDocEmployeeIds] = useState<string[]>([]);
-  const [docsLoading, setDocsLoading] = useState(false);
-  const [docsError, setDocsError] = useState<string | null>(null);
-
-  // file picker states
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
-  const [uploading, setUploading] = useState(false);
 
-  // followups state
-  const [followups, setFollowups] = useState<Followup[]>([]);
-  const [followupsLoading, setFollowupsLoading] = useState(false);
-  const [followupsError, setFollowupsError] = useState<string | null>(null);
+  const {
+    deal,
+    setDeal,
+    loading,
+    setLoading,
+    error,
+    setError,
+    activeTab,
+    setActiveTab,
+    documents,
+    setDocuments,
+    setDocEmployeeIds,
+    docsLoading,
+    setDocsLoading,
+    docsError,
+    setDocsError,
+    selectedFile,
+    setSelectedFile,
+    selectedFileName,
+    setSelectedFileName,
+    uploading,
+    setUploading,
+    followups,
+    setFollowups,
+    followupsLoading,
+    setFollowupsLoading,
+    followupsError,
+    setFollowupsError,
+    isFollowupModalOpen,
+    setIsFollowupModalOpen,
+    editingFollowup,
+    setEditingFollowup,
+    followupSaving,
+    setFollowupSaving,
+    assignedEmployees,
+    setAssignedEmployees,
+    employeesLoading,
+    setEmployeesLoading,
+    employeesError,
+    setEmployeesError,
+    isAddPeopleOpen,
+    setIsAddPeopleOpen,
+    allEmployeesPool,
+    setAllEmployeesPool,
+    availableToAdd,
+    setAvailableToAdd,
+    departments,
+    setDepartments,
+    selectedAddEmployeeId,
+    setSelectedAddEmployeeId,
+    selectedDepartment,
+    setSelectedDepartment,
+    peopleSaving,
+    setPeopleSaving,
+    peopleDeletingId,
+    setPeopleDeletingId,
+    peopleSearch,
+    setPeopleSearch,
+    notes,
+    setNotes,
+    notesLoading,
+    setNotesLoading,
+    notesError,
+    setNotesError,
+    isNoteModalOpen,
+    setIsNoteModalOpen,
+    noteModalMode,
+    setNoteModalMode,
+    editingNote,
+    setEditingNote,
+    noteSaving,
+    setNoteSaving,
+    setNoteDeletingId,
+    tags,
+    setTags,
+    tagsLoading,
+    setTagsLoading,
+    tagsError,
+    setTagsError,
+    isAddTagOpen,
+    setIsAddTagOpen,
+    tagValue,
+    setTagValue,
+    tagSaving,
+    setTagSaving,
+    tagDeletingId,
+    setTagDeletingId,
+    isAddCommentOpen,
+    setIsAddCommentOpen,
+    commentText,
+    setCommentText,
+    commentSaving,
+    setCommentSaving,
+    commentDeletingId,
+    setCommentDeletingId,
+    openActionMenu,
+    setOpenActionMenu,
+    setMenuPosition,
+    editingFollowupData,
+    setEditingFollowupData,
+    noteActionData,
+    setNoteActionData,
+    noteActionMode,
+    setNoteActionMode,
+    resetDealDetailState,
+  } = useDealDetailStore();
 
-  // followup modal state
-  const [isFollowupModalOpen, setIsFollowupModalOpen] = useState(false);
-  const [editingFollowup, setEditingFollowup] = useState<Followup | null>(null);
-  const [followupSaving, setFollowupSaving] = useState(false);
-
-  // people (employees) state & modal
-  const [assignedEmployees, setAssignedEmployees] = useState<Employee[]>([]);
-  const [employeesLoading, setEmployeesLoading] = useState(false);
-  const [employeesError, setEmployeesError] = useState<string | null>(null);
-  const [isAddPeopleOpen, setIsAddPeopleOpen] = useState(false);
-
-  // available pool & departments for the Add People form
-  const [allEmployeesPool, setAllEmployeesPool] = useState<Employee[]>([]);
-  const [availableToAdd, setAvailableToAdd] = useState<Employee[]>([]);
-  const [departments, setDepartments] = useState<string[]>([]);
-  const [selectedAddEmployeeId, setSelectedAddEmployeeId] = useState<string | null>(null);
-  const [selectedDepartment, setSelectedDepartment] = useState<string>(""); // "" = All
-  const [peopleSaving, setPeopleSaving] = useState(false);
-  const [peopleDeletingId, setPeopleDeletingId] = useState<string | null>(null);
-  const [peopleSearch, setPeopleSearch] = useState<string>("");
-
-  // notes state
-  const [notes, setNotes] = useState<NoteItem[]>([]);
-  const [notesLoading, setNotesLoading] = useState(false);
-  const [notesError, setNotesError] = useState<string | null>(null);
-
-  // notes modal & mode
-  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false);
-  const [noteModalMode, setNoteModalMode] = useState<"add" | "edit" | "view">("add");
-  const [editingNote, setEditingNote] = useState<NoteItem | null>(null);
-  const [noteSaving, setNoteSaving] = useState(false);
-  const [noteDeletingId, setNoteDeletingId] = useState<number | null>(null);
-
-  // tags state
-  // Note: keep TagItem[], but server may sometimes return string[] — rendering handles both forms.
-  const [tags, setTags] = useState<(TagItem | string)[]>([]);
-  const [tagsLoading, setTagsLoading] = useState(false);
-  const [tagsError, setTagsError] = useState<string | null>(null);
-  const [isAddTagOpen, setIsAddTagOpen] = useState(false);
-  const [tagValue, setTagValue] = useState<string>("");
-  const [tagSaving, setTagSaving] = useState(false);
-  const [tagDeletingId, setTagDeletingId] = useState<number | null>(null);
-
-  // Comments modal (UI) state
-  const [isAddCommentOpen, setIsAddCommentOpen] = useState(false);
-  const [commentText, setCommentText] = useState("");
-  const [commentSaving, setCommentSaving] = useState(false);
-  const [commentDeletingId, setCommentDeletingId] = useState<number | null>(null);
-
-  // centralized action menu state to avoid overlap + easy click-away
-  const [openActionMenu, setOpenActionMenu] = useState<string | null>(null);
-
-  // const [menuPosition, setMenuPosition] = useState<{ top: number; left: number } | null>(null);
-  // const [openActionMenu, setOpenActionMenu] = useState(null);
-  const [menuPosition, setMenuPosition] = useState(null);
-
-  //edit followup modal click-away handler
-  const [editingFollowupData, setEditingFollowupData] = useState<Followup | null>(null);
-
-  //note action modal state
-  const [noteActionData, setNoteActionData] = useState<NoteItem | null>(null);
-const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(null);
-
-
-
+  useEffect(() => {
+    resetDealDetailState();
+  }, [dealId, resetDealDetailState]);
 
   // useEffect(() => {
   //   const close = () => {
@@ -174,8 +151,6 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
   //   };
   // }, []);
 
-
-
   //   useEffect(() => {
   //   const close = () => {
   //     setOpenActionMenu(null);
@@ -188,10 +163,6 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
   //     document.removeEventListener("click", close);
   //   };
   // }, []);
-
-
-
-
 
   // --- fetch deal
   const fetchDeal = async () => {
@@ -216,11 +187,13 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
         throw new Error(`Failed to fetch deal: ${res.statusText}`);
       }
 
-      const data: Deal = await res.json();
+      const data: DealDetail = await res.json();
       setDeal(data);
     } catch (err: any) {
       console.error(err);
-      setError(err.message || "Failed to load deal details. Please try again later.");
+      setError(
+        err.message || "Failed to load deal details. Please try again later.",
+      );
     } finally {
       setLoading(false);
     }
@@ -262,8 +235,10 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
         if (Array.isArray(json)) {
           setDocuments(json);
         } else {
-          if (Array.isArray(json.employeeIds)) setDocEmployeeIds(json.employeeIds);
-          if (Array.isArray((json as any).documents)) setDocuments((json as any).documents);
+          if (Array.isArray(json.employeeIds))
+            setDocEmployeeIds(json.employeeIds);
+          if (Array.isArray((json as any).documents))
+            setDocuments((json as any).documents);
         }
       } catch (err: any) {
         console.error(err);
@@ -290,7 +265,10 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
           return;
         }
         const res = await fetch(`${BASE_URL}/deals/${dealId}/followups`, {
-          headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
         });
         if (!res.ok) {
           const txt = await res.text().catch(() => "");
@@ -323,7 +301,10 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
       }
 
       const res = await fetch(`${BASE_URL}/deals/${dealId}/employees`, {
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
       });
 
       if (!res.ok) {
@@ -365,7 +346,10 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
         return;
       }
       const res = await fetch(`${BASE_URL}/deals/${dealId}/notes`, {
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
       });
       if (!res.ok) {
         const txt = await res.text().catch(() => "");
@@ -400,7 +384,10 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
         return;
       }
       const res = await fetch(`${BASE_URL}/deals/${dealId}/tags`, {
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
       });
       if (!res.ok) {
         const txt = await res.text().catch(() => "");
@@ -457,7 +444,6 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
       //   }
       // }
 
-
       const depRes = await fetch(`${BASE_URL}/admin/departments`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -481,7 +467,7 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
           .map((d: any) =>
             typeof d === "string"
               ? d
-              : d.name || d.department || d.departmentName || ""
+              : d.name || d.department || d.departmentName || "",
           )
           .filter(Boolean);
 
@@ -491,13 +477,11 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
         setDepartments(unique);
       }
 
-
-
-
-
-
       const empRes = await fetch(`${BASE_URL}/employee/all`, {
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
       });
 
       if (!empRes.ok) {
@@ -512,24 +496,33 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
         } else if (Array.isArray((empJson as any).employees)) {
           pool = (empJson as any).employees;
         } else {
-          pool = Object.values(empJson).flat?.() ?? [];
+          pool =
+            (Object.values(
+              empJson as Record<string, unknown>,
+            ).flat() as Employee[]) ?? [];
         }
 
-        const normalized = (pool as any[]).map((p) => ({
-          employeeId: p.employeeId ?? p.id ?? p.empId ?? p.employee_id ?? "",
-          name: p.name ?? p.fullName ?? p.employeeName ?? "",
-          department: p.department ?? p.dept ?? p.departmentName ?? "",
-          designation: p.designation ?? p.title ?? "",
-          profileUrl: p.profileUrl ?? p.avatar ?? "",
-        })).filter((p) => p.employeeId && p.name);
+        const normalized = (pool as any[])
+          .map((p) => ({
+            employeeId: p.employeeId ?? p.id ?? p.empId ?? p.employee_id ?? "",
+            name: p.name ?? p.fullName ?? p.employeeName ?? "",
+            department: p.department ?? p.dept ?? p.departmentName ?? "",
+            designation: p.designation ?? p.title ?? "",
+            profileUrl: p.profileUrl ?? p.avatar ?? "",
+          }))
+          .filter((p) => p.employeeId && p.name);
 
         setAllEmployeesPool(normalized);
 
         // remove already assigned employees from available list
         const assignedIds = new Set(assignedEmployees.map((a) => a.employeeId));
-        const filtered = normalized.filter((p) => !assignedIds.has(p.employeeId));
+        const filtered = normalized.filter(
+          (p) => !assignedIds.has(p.employeeId),
+        );
         setAvailableToAdd(filtered);
-        setSelectedAddEmployeeId(filtered.length > 0 ? filtered[0].employeeId : null);
+        setSelectedAddEmployeeId(
+          filtered.length > 0 ? filtered[0].employeeId : null,
+        );
       }
     } catch (err: any) {
       console.error("Error loading add-people resources", err);
@@ -553,11 +546,20 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
     const assignedIds = new Set(assignedEmployees.map((a) => a.employeeId));
     let pool = allEmployeesPool.filter((p) => !assignedIds.has(p.employeeId));
     if (selectedDepartment && selectedDepartment !== "") {
-      pool = pool.filter((p) => (p.department || "").toLowerCase() === selectedDepartment.toLowerCase());
+      pool = pool.filter(
+        (p) =>
+          (p.department || "").toLowerCase() ===
+          selectedDepartment.toLowerCase(),
+      );
     }
     setAvailableToAdd(pool);
     setSelectedAddEmployeeId(pool.length > 0 ? pool[0].employeeId : null);
-  }, [selectedDepartment, allEmployeesPool, assignedEmployees, isAddPeopleOpen]);
+  }, [
+    selectedDepartment,
+    allEmployeesPool,
+    assignedEmployees,
+    isAddPeopleOpen,
+  ]);
 
   // add employee (POST)
   const addEmployee = async () => {
@@ -595,7 +597,9 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
       await fetchAssignedEmployees();
 
       // refresh availableToAdd: remove newly added
-      setAvailableToAdd((prev) => prev.filter((p) => p.employeeId !== selectedAddEmployeeId));
+      setAvailableToAdd((prev) =>
+        prev.filter((p) => p.employeeId !== selectedAddEmployeeId),
+      );
       setSelectedAddEmployeeId(null);
 
       // close modal for cleaner UX
@@ -611,7 +615,8 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
   // delete employee (DELETE to specified endpoint)
   const removeEmployee = async (employeeId?: string) => {
     if (!dealId || !employeeId) return;
-    if (!confirm("Are you sure you want to remove this person from the deal?")) return;
+    if (!confirm("Are you sure you want to remove this person from the deal?"))
+      return;
     setPeopleDeletingId(employeeId);
     try {
       const token = localStorage.getItem("accessToken");
@@ -621,12 +626,15 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
         return;
       }
 
-      const res = await fetch(`${BASE_URL}/deals/${dealId}/employees/${employeeId}`, {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
+      const res = await fetch(
+        `${BASE_URL}/deals/${dealId}/employees/${employeeId}`,
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         },
-      });
+      );
       if (!res.ok) {
         const txt = await res.text().catch(() => "");
         throw new Error(`Failed to remove employee: ${res.status} ${txt}`);
@@ -670,8 +678,6 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
   //   setIsFollowupModalOpen(true);
   // };
 
-
-
   const openEditFollowup = (f: any) => {
     setEditingFollowup({
       id: f.id,
@@ -685,8 +691,6 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
     });
     setIsFollowupModalOpen(true);
   };
-
-
 
   const closeFollowupModal = () => {
     setIsFollowupModalOpen(false);
@@ -756,9 +760,6 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
   //   }
   // };
 
-
-
-
   const saveFollowup = async () => {
     if (!editingFollowup || !dealId) return;
 
@@ -799,7 +800,7 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
               "Content-Type": "application/json",
             },
             body: JSON.stringify(payload),
-          }
+          },
         );
       } else {
         // CREATE
@@ -824,7 +825,7 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
       setFollowups((prev) => {
         if (editingFollowup.id) {
           return prev.map((f) =>
-            f.id === updatedFollowup.id ? updatedFollowup : f
+            f.id === updatedFollowup.id ? updatedFollowup : f,
           );
         }
         return [updatedFollowup, ...prev];
@@ -851,15 +852,12 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
         return;
       }
 
-      const res = await fetch(
-        `${BASE_URL}/deals/${dealId}/followups/${id}`,
-        {
-          method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const res = await fetch(`${BASE_URL}/deals/${dealId}/followups/${id}`, {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (!res.ok) {
         const txt = await res.text().catch(() => "");
@@ -925,14 +923,17 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
 
       let res: Response;
       if (noteModalMode === "edit" && editingNote.id != null) {
-        res = await fetch(`${BASE_URL}/deals/${dealId}/notes/${editingNote.id}`, {
-          method: "PUT",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            "Content-Type": "application/json",
+        res = await fetch(
+          `${BASE_URL}/deals/${dealId}/notes/${editingNote.id}`,
+          {
+            method: "PUT",
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload),
           },
-          body: JSON.stringify(payload),
-        });
+        );
       } else {
         res = await fetch(`${BASE_URL}/deals/${dealId}/notes`, {
           method: "POST",
@@ -1140,10 +1141,13 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
         return;
       }
 
-      const res = await fetch(`${BASE_URL}/deals/${dealId}/comments/${commentId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${BASE_URL}/deals/${dealId}/comments/${commentId}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
 
       if (!res.ok) {
         const txt = await res.text().catch(() => "");
@@ -1161,15 +1165,16 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
   };
 
   // Small UI helpers
-  const formatDate = (d?: string) => (d ? 
-    // new Date(d).toLocaleDateString() 
-   format(new Date(d), "dd-MM-yyyy")
-    : "—");
+  const formatDate = (d?: string) =>
+    d
+      ? // new Date(d).toLocaleDateString()
+        format(new Date(d), "dd-MM-yyyy")
+      : "—";
   const formatTime = (t?: string) => (t ? t : "—");
 
   // People modal search filter
   const filteredAssigned = assignedEmployees.filter((a) =>
-    (a.name || "").toLowerCase().includes(peopleSearch.toLowerCase())
+    (a.name || "").toLowerCase().includes(peopleSearch.toLowerCase()),
   );
 
   // Document-level click-away: close any open action menu when clicking anywhere
@@ -1182,7 +1187,7 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
   // }, []);
   const toggleActionMenu = (
     key: string,
-    e: React.MouseEvent<HTMLButtonElement>
+    e: React.MouseEvent<HTMLButtonElement>,
   ) => {
     e.preventDefault();
     e.stopPropagation();
@@ -1196,9 +1201,6 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
 
     setOpenActionMenu((prev) => (prev === key ? null : key));
   };
-
-
-
 
   // used to stop close when clicking inside menu itself
   const stopPropagation = (e: React.MouseEvent) => {
@@ -1296,10 +1298,13 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
         return;
       }
 
-      const res = await fetch(`${BASE_URL}/deals/${dealId}/documents/${docId}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await fetch(
+        `${BASE_URL}/deals/${dealId}/documents/${docId}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
 
       if (!res.ok) {
         const txt = await res.text().catch(() => "");
@@ -1321,61 +1326,53 @@ const [noteActionMode, setNoteActionMode] = useState<"view" | "edit" | null>(nul
   //   );
   // }
 
+  if (loading) {
+    return (
+      <div className="p-6 max-w-6xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex justify-between items-center">
+          <Skeleton width={180} height={25} />
+          <Skeleton width={30} height={30} />
+        </div>
 
-if (loading) {
-  return (
-    <div className="p-6 max-w-6xl mx-auto space-y-6">
+        {/* Main Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
+          {/* Left Card */}
+          <div className="bg-white border rounded-2xl p-6 space-y-4">
+            <Skeleton width={200} height={20} />
+            <Skeleton width={150} height={15} />
 
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <Skeleton width={180} height={25} />
-        <Skeleton width={30} height={30} />
-      </div>
+            <div className="grid grid-cols-2 gap-4">
+              {[...Array(8)].map((_, i) => (
+                <Skeleton key={i} height={15} />
+              ))}
+            </div>
+          </div>
 
-      {/* Main Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
-
-        {/* Left Card */}
-        <div className="bg-white border rounded-2xl p-6 space-y-4">
-          <Skeleton width={200} height={20} />
-          <Skeleton width={150} height={15} />
-
-          <div className="grid grid-cols-2 gap-4">
-            {[...Array(8)].map((_, i) => (
+          {/* Right Card */}
+          <div className="bg-white border rounded-2xl p-6 space-y-3">
+            <Skeleton width={150} height={20} />
+            {[...Array(4)].map((_, i) => (
               <Skeleton key={i} height={15} />
             ))}
           </div>
         </div>
 
-        {/* Right Card */}
-        <div className="bg-white border rounded-2xl p-6 space-y-3">
-          <Skeleton width={150} height={20} />
-          {[...Array(4)].map((_, i) => (
-            <Skeleton key={i} height={15} />
-          ))}
-        </div>
+        {/* Tabs Section */}
+        <div className="bg-white border rounded-2xl p-4 space-y-4">
+          <div className="flex gap-4">
+            {[...Array(5)].map((_, i) => (
+              <Skeleton key={i} width={80} height={20} />
+            ))}
+          </div>
 
-      </div>
-
-      {/* Tabs Section */}
-      <div className="bg-white border rounded-2xl p-4 space-y-4">
-        <div className="flex gap-4">
           {[...Array(5)].map((_, i) => (
-            <Skeleton key={i} width={80} height={20} />
+            <Skeleton key={i} height={20} />
           ))}
         </div>
-
-        {[...Array(5)].map((_, i) => (
-          <Skeleton key={i} height={20} />
-        ))}
       </div>
-
-    </div>
-  );
-}
-
-
-
+    );
+  }
 
   if (error || !deal) {
     return (
@@ -1392,9 +1389,6 @@ if (loading) {
     // <div className="p-6 max-w-6xl mx-auto">
 
     <div className="p-6 max-w-6xl mx-auto">
-
-
-
       <div className="flex items-start justify-between mb-6">
         <div>
           <Link
@@ -1403,7 +1397,9 @@ if (loading) {
           >
             ← Back to Deals
           </Link>
-          <h1 className="text-2xl font-semibold text-gray-900">Deal {deal.title || deal.id}</h1>
+          <h1 className="text-2xl font-semibold text-gray-900">
+            Deal {deal.title || deal.id}
+          </h1>
         </div>
 
         <button
@@ -1425,13 +1421,19 @@ if (loading) {
                   <span className="font-medium">{deal.pipeline}</span> →{" "}
                   <span className="font-semibold">{deal.dealStage || "—"}</span>
                 </div>
-                <h2 className="text-lg font-semibold">{deal.title ||  "—"} </h2>
-                <p className="text-xs text-muted-foreground mt-1">ID: {deal.id}</p>
+                <h2 className="text-lg font-semibold">{deal.title || "—"} </h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  ID: {deal.id}
+                </p>
               </div>
 
               <div className="flex items-start gap-3">
                 <button className="p-2 rounded-md hover:bg-slate-50">
-                  <svg className="w-5 h-5 text-gray-400" viewBox="0 0 24 24" fill="none">
+                  <svg
+                    className="w-5 h-5 text-gray-400"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
                     <circle cx="5" cy="12" r="1.5" />
                     <circle cx="12" cy="12" r="1.5" />
                     <circle cx="19" cy="12" r="1.5" />
@@ -1449,22 +1451,30 @@ if (loading) {
 
                 <div className="flex justify-between">
                   <span className="text-gray-600">Lead Contact</span>
-                  <span className="text-gray-900">{deal.leadName || "—"}</span>
+                  <span className="text-gray-900">
+                    {deal?.lead?.mobileNumber || "—"}
+                  </span>
                 </div>
 
                 <div className="flex justify-between">
                   <span className="text-gray-600">Email</span>
-                  <span className="text-gray-900">{deal.leadEmail || "—"}</span>
+                  <span className="text-gray-900">
+                    {deal?.lead?.email || "—"}
+                  </span>
                 </div>
 
                 <div className="flex justify-between">
                   <span className="text-gray-600">Company Name</span>
-                  <span className="text-gray-900">{(deal as any).leadCompany || "—"}</span>
+                  <span className="text-gray-900">
+                    {(deal as any)?.lead?.companyName || "—"}
+                  </span>
                 </div>
 
                 <div className="flex justify-between">
                   <span className="text-gray-600">Deal Category</span>
-                  <span className="text-gray-900">{deal.dealCategory || "—"}</span>
+                  <span className="text-gray-900">
+                    {deal.dealCategory || "—"}
+                  </span>
                 </div>
               </div>
 
@@ -1479,8 +1489,10 @@ if (loading) {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Deal Watcher</span>
                   <span className="text-gray-900">
-                    {(deal.dealWatchersMeta && deal.dealWatchersMeta.map((d) => d.name).join(", ")) ||
-                      (deal.dealWatchers && (deal.dealWatchers as string[]).join(", ")) ||
+                    {(deal.dealWatchersMeta &&
+                      deal.dealWatchersMeta.map((d) => d.name).join(", ")) ||
+                      (deal.dealWatchers &&
+                        (deal.dealWatchers as string[]).join(", ")) ||
                       "—"}
                   </span>
                 </div>
@@ -1488,17 +1500,19 @@ if (loading) {
                 <div className="flex justify-between">
                   <span className="text-gray-600">Close Date</span>
                   <span className="text-gray-900">
-                    {deal.expectedCloseDate ?
-                    //  new Date(deal.expectedCloseDate).toLocaleDateString() : "—"
-                   format( new Date(deal.expectedCloseDate), "dd-MM-yyyy") : "—"
-                    }
+                    {deal.expectedCloseDate
+                      ? //  new Date(deal.expectedCloseDate).toLocaleDateString() : "—"
+                        format(new Date(deal.expectedCloseDate), "dd-MM-yyyy")
+                      : "—"}
                   </span>
                 </div>
 
                 <div className="flex justify-between">
                   <span className="text-gray-600">Deal Value</span>
                   <span className="text-gray-900">
-                    {typeof deal.value === "number" ? `$${deal.value.toLocaleString(undefined)}` : "—"}
+                    {typeof deal.value === "number"
+                      ? `$${deal.value.toLocaleString(undefined)}`
+                      : "—"}
                   </span>
                 </div>
               </div>
@@ -1567,10 +1581,30 @@ if (loading) {
                       className="inline-flex items-center gap-2 px-3 py-2 rounded-md border text-sm text-violet-600 hover:bg-violet-50"
                       onClick={handleOpenFilePicker}
                     >
-                      <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path d="M12 4v12" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        <path d="M8 8l4-4 4 4" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        <path d="M20 20H4" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      <svg
+                        className="w-4 h-4"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                      >
+                        <path
+                          d="M12 4v12"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M8 8l4-4 4 4"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M20 20H4"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
                       </svg>
                       Choose File
                     </button>
@@ -1580,7 +1614,10 @@ if (loading) {
                       {selectedFileName ? (
                         <span>Selected: {selectedFileName}</span>
                       ) : (
-                        <span>No file selected (will use developer local file if you press Upload without selecting).</span>
+                        <span>
+                          No file selected (will use developer local file if you
+                          press Upload without selecting).
+                        </span>
                       )}
                     </div>
                   </div>
@@ -1602,7 +1639,8 @@ if (loading) {
                       onClick={() => {
                         setSelectedFile(null);
                         setSelectedFileName(null);
-                        if (fileInputRef.current) fileInputRef.current.value = "";
+                        if (fileInputRef.current)
+                          fileInputRef.current.value = "";
                       }}
                       className="inline-flex items-center gap-2 px-3 py-2 rounded-md border text-sm text-gray-600 hover:bg-slate-50"
                     >
@@ -1613,38 +1651,49 @@ if (loading) {
                   <div className="mt-6 text-sm text-gray-500">
                     {/* {docsLoading && <div>Loading documents...</div>} */}
 
+                    {docsLoading && (
+                      <div className="space-y-3 mt-4">
+                        {[...Array(3)].map((_, i) => (
+                          <div key={i} className="flex items-center gap-3">
+                            <Skeleton width={50} height={50} />
+                            <Skeleton width={200} />
+                          </div>
+                        ))}
+                      </div>
+                    )}
 
-{docsLoading && (
-  <div className="space-y-3 mt-4">
-    {[...Array(3)].map((_, i) => (
-      <div key={i} className="flex items-center gap-3">
-        <Skeleton width={50} height={50} />
-        <Skeleton width={200} />
-      </div>
-    ))}
-  </div>
-)}
-
-
-
-                    {docsError && <div className="text-red-600">{docsError}</div>}
-                    {!docsLoading && documents.length === 0 && <div>No files uploaded yet.</div>}
+                    {docsError && (
+                      <div className="text-red-600">{docsError}</div>
+                    )}
+                    {!docsLoading && documents.length === 0 && (
+                      <div>No files uploaded yet.</div>
+                    )}
                     <div className="space-y-3 mt-4">
                       {documents.map((doc, idx) => (
-                        <div key={doc.id ?? `${doc.filename}-${idx}`} className="flex items-center justify-between p-3 border rounded-md">
+                        <div
+                          key={doc.id ?? `${doc.filename}-${idx}`}
+                          className="flex items-center justify-between p-3 border rounded-md"
+                        >
                           <div className="flex items-center gap-3">
                             <div className="w-12 h-12 rounded-md overflow-hidden bg-slate-100 flex items-center justify-center text-xs text-gray-400">
-                              <img src={doc.url || UPLOADED_LOCAL_PATH} alt={doc.filename} className="w-full h-full object-cover" />
+                              <img
+                                src={doc.url || UPLOADED_LOCAL_PATH}
+                                alt={doc.filename}
+                                className="w-full h-full object-cover"
+                              />
                             </div>
                             <div className="text-sm">
                               <div className="font-medium">{doc.filename}</div>
                               <div className="text-xs text-gray-500">
                                 {/* Uploaded: {doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleString() : "—"} */}
-
-                                 Uploaded: {doc.uploadedAt
-    ? format(new Date(doc.uploadedAt), "dd-MM-yyyy hh:mm a")
-    : "—"}
-                                </div>
+                                Uploaded:{" "}
+                                {doc.uploadedAt
+                                  ? format(
+                                      new Date(doc.uploadedAt),
+                                      "dd-MM-yyyy hh:mm a",
+                                    )
+                                  : "—"}
+                              </div>
                             </div>
                           </div>
 
@@ -1679,17 +1728,31 @@ if (loading) {
                       onClick={openAddFollowup}
                       className="inline-flex items-center gap-2 text-blue-600"
                     >
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path d="M12 5v14" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        <path d="M5 12h14" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      <svg
+                        className="w-5 h-5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                      >
+                        <path
+                          d="M12 5v14"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M5 12h14"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
                       </svg>
-                      Add a Follow Up 
+                      Add a Follow Up
                     </button>
                   </div>
 
                   {/* <div className="rounded-md border overflow-hidden"> */}
                   <div className="rounded-md border overflow-visible">
-
                     <div className="bg-blue-50 text-sm text-gray-700 grid grid-cols-[1fr_1fr_1fr_1fr_80px] gap-3 p-2 items-center font-medium">
                       <div>Created</div>
                       <div>Follow Up</div>
@@ -1701,30 +1764,33 @@ if (loading) {
                     <div>
                       {/* {followupsLoading && <div className="p-4">Loading followups...</div>} */}
 
+                      {followupsLoading && (
+                        <div className="space-y-3 p-4">
+                          {[...Array(4)].map((_, i) => (
+                            <div key={i} className="grid grid-cols-4 gap-4">
+                              <Skeleton height={15} />
+                              <Skeleton height={15} />
+                              <Skeleton height={15} />
+                              <Skeleton height={15} />
+                            </div>
+                          ))}
+                        </div>
+                      )}
 
-
-{followupsLoading && (
-  <div className="space-y-3 p-4">
-    {[...Array(4)].map((_, i) => (
-      <div key={i} className="grid grid-cols-4 gap-4">
-        <Skeleton height={15} />
-        <Skeleton height={15} />
-        <Skeleton height={15} />
-        <Skeleton height={15} />
-      </div>
-    ))}
-  </div>
-)}
-
-
-
-                      {followupsError && <div className="p-4 text-red-600">{followupsError}</div>}
+                      {followupsError && (
+                        <div className="p-4 text-red-600">{followupsError}</div>
+                      )}
                       {!followupsLoading && followups.length === 0 && (
-                        <div className="p-4 text-sm text-gray-500">No follow ups</div>
+                        <div className="p-4 text-sm text-gray-500">
+                          No follow ups
+                        </div>
                       )}
 
                       {followups.map((f, idx) => (
-                        <div key={f.id ?? `followup-${idx}`} className="grid grid-cols-[1fr_1fr_1fr_1fr_80px] gap-4 items-center p-4 border-t">
+                        <div
+                          key={f.id ?? `followup-${idx}`}
+                          className="grid grid-cols-[1fr_1fr_1fr_1fr_80px] gap-4 items-center p-4 border-t"
+                        >
                           <div>{formatDate(f.nextDate)}</div>
                           <div>{formatTime(f.startTime)}</div>
                           <div>{f.remarks || "---"}</div>
@@ -1733,20 +1799,15 @@ if (loading) {
                               <span
                                 className={`inline-block w-3 h-3 rounded-full ${f.status === "PENDING" ? "bg-yellow-400" : f.status === "CANCELLED" ? "bg-gray-400" : f.status === "COMPLETED" ? "bg-green-400" : "bg-gray-300"}`}
                               />
-                              <span className="text-sm">{f.status ?? "PENDING"}</span>
+                              <span className="text-sm">
+                                {f.status ?? "PENDING"}
+                              </span>
                             </div>
                           </div>
 
                           {/* action menu (uses openActionMenu state) */}
                           <div className="relative">
-                           
-
-
-                            <div className="text-center">
-                             
-
-                            </div>
-
+                            <div className="text-center"></div>
 
                             <div className="relative flex justify-center">
                               <button
@@ -1755,7 +1816,7 @@ if (loading) {
                                   setOpenActionMenu(
                                     openActionMenu === `followup-${f.id ?? idx}`
                                       ? null
-                                      : `followup-${f.id ?? idx}`
+                                      : `followup-${f.id ?? idx}`,
                                   )
                                 }
                                 className="p-1 rounded hover:bg-slate-100 text-gray-600"
@@ -1787,12 +1848,6 @@ if (loading) {
                                 </div>
                               )}
                             </div>
-
-
-
-
-
-
                           </div>
                         </div>
                       ))}
@@ -1809,9 +1864,24 @@ if (loading) {
                       onClick={openAddPeopleModal}
                       className="inline-flex items-center gap-2 text-blue-600"
                     >
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                        <path d="M12 5v14" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        <path d="M5 12h14" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                      <svg
+                        className="w-5 h-5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                      >
+                        <path
+                          d="M12 5v14"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M5 12h14"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
                       </svg>
                       Add People
                     </button>
@@ -1838,42 +1908,62 @@ if (loading) {
                     <div>
                       {/* {employeesLoading && <div className="p-4">Loading people...</div>} */}
 
-{employeesLoading && (
-  <div className="space-y-3 p-4">
-    {[...Array(4)].map((_, i) => (
-      <div key={i} className="flex items-center gap-3">
-        <Skeleton circle width={40} height={40} />
-        <Skeleton width={150} />
-      </div>
-    ))}
-  </div>
-)}
+                      {employeesLoading && (
+                        <div className="space-y-3 p-4">
+                          {[...Array(4)].map((_, i) => (
+                            <div key={i} className="flex items-center gap-3">
+                              <Skeleton circle width={40} height={40} />
+                              <Skeleton width={150} />
+                            </div>
+                          ))}
+                        </div>
+                      )}
 
-
-                      {employeesError && <div className="p-4 text-red-600">{employeesError}</div>}
+                      {employeesError && (
+                        <div className="p-4 text-red-600">{employeesError}</div>
+                      )}
                       {!employeesLoading && assignedEmployees.length === 0 && (
-                        <div className="p-4 text-sm text-gray-500">No people assigned</div>
+                        <div className="p-4 text-sm text-gray-500">
+                          No people assigned
+                        </div>
                       )}
 
                       {filteredAssigned.map((a, idx) => (
-                        <div key={a.employeeId ?? `emp-${idx}`} className="grid grid-cols-[1fr_1fr_1fr_80px] gap-4 items-center p-4 border-t">
+                        <div
+                          key={a.employeeId ?? `emp-${idx}`}
+                          className="grid grid-cols-[1fr_1fr_1fr_80px] gap-4 items-center p-4 border-t"
+                        >
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-full overflow-hidden bg-slate-100">
                               {a.profileUrl ? (
-                                <img src={a.profileUrl} alt={a.name} className="w-full h-full object-cover" />
+                                <img
+                                  src={a.profileUrl}
+                                  alt={a.name}
+                                  className="w-full h-full object-cover"
+                                />
                               ) : (
-                                <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">N</div>
+                                <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">
+                                  N
+                                </div>
                               )}
                             </div>
                             <div>
-                              <div className="font-medium text-sm">{a.name}</div>
-                              <div className="text-xs text-gray-500">{a.designation || ""}</div>
-                              <div className="text-xs text-gray-400">ID: {a.employeeId}</div>
+                              <div className="font-medium text-sm">
+                                {a.name}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                {a.designation || ""}
+                              </div>
+                              <div className="text-xs text-gray-400">
+                                ID: {a.employeeId}
+                              </div>
                             </div>
                           </div>
 
                           <div className="text-sm">{a.department || "—"}</div>
-                          <div className="text-sm text-center">{a.designation || "—"}</div>
+                          <div className="text-sm text-center">
+                            {a.designation || "—"}
+                          </div>
 
                           <div className="text-center">
                             <button
@@ -1882,7 +1972,9 @@ if (loading) {
                               className="text-red-600 hover:underline"
                               aria-label="Remove"
                             >
-                              {peopleDeletingId === a.employeeId ? "Removing..." : "🗑️"}
+                              {peopleDeletingId === a.employeeId
+                                ? "Removing..."
+                                : "🗑️"}
                             </button>
                           </div>
                         </div>
@@ -1895,10 +1987,23 @@ if (loading) {
               {activeTab === "notes" && (
                 <div>
                   <div className="mb-4">
-                    <button onClick={openAddNote} className="inline-flex items-center gap-2 text-blue-600">
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <button
+                      onClick={openAddNote}
+                      className="inline-flex items-center gap-2 text-blue-600"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                      >
                         <circle cx="12" cy="12" r="11" strokeWidth="1" />
-                        <path d="M12 8v8M8 12h8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <path
+                          d="M12 8v8M8 12h8"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
                       </svg>
                       Add a Note
                     </button>
@@ -1907,7 +2012,6 @@ if (loading) {
                   {/* Notes table (styled like your screenshot) */}
                   {/* <div className="rounded-md border overflow-hidden"> */}
                   <div className="rounded-md border overflow-visible">
-
                     <div className="bg-blue-50 text-sm text-gray-700 grid grid-cols-[1fr_1fr_80px] gap-3 p-3 items-center font-medium rounded-t-md">
                       <div>Note Title</div>
                       <div>Note Type</div>
@@ -1917,37 +2021,51 @@ if (loading) {
                     <div>
                       {/* {notesLoading && <div className="p-6 text-sm text-gray-500">Loading notes...</div>} */}
 
+                      {notesLoading && (
+                        <div className="space-y-3 p-4">
+                          {[...Array(4)].map((_, i) => (
+                            <Skeleton key={i} height={20} />
+                          ))}
+                        </div>
+                      )}
 
-{notesLoading && (
-  <div className="space-y-3 p-4">
-    {[...Array(4)].map((_, i) => (
-      <Skeleton key={i} height={20} />
-    ))}
-  </div>
-)}
-
-
-
-                      {notesError && <div className="p-6 text-sm text-red-600">{notesError}</div>}
+                      {notesError && (
+                        <div className="p-6 text-sm text-red-600">
+                          {notesError}
+                        </div>
+                      )}
 
                       {!notesLoading && notes.length === 0 && (
-                        <div className="p-6 text-sm text-gray-500">No notes yet.</div>
+                        <div className="p-6 text-sm text-gray-500">
+                          No notes yet.
+                        </div>
                       )}
 
                       {notes.map((n, idx) => (
-                        <div key={n.id ?? `note-${idx}`} className="grid grid-cols-[1fr_1fr_80px] items-start border-t p-4">
+                        <div
+                          key={n.id ?? `note-${idx}`}
+                          className="grid grid-cols-[1fr_1fr_80px] items-start border-t p-4"
+                        >
                           <div>
-                            <div className="font-medium text-sm">{n.noteTitle}</div>
-                            <div className="text-xs text-gray-500">ID: {n.id} • {n.createdBy || "--"}</div>
+                            <div className="font-medium text-sm">
+                              {n.noteTitle}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              ID: {n.id} • {n.createdBy || "--"}
+                            </div>
                           </div>
                           <div className="text-sm">
                             <div className="inline-flex items-center gap-2">
-                              <span className="text-xs text-gray-500">{n.noteType === "PUBLIC" ? "🌐 Public" : "🔒 Private"}</span>
+                              <span className="text-xs text-gray-500">
+                                {n.noteType === "PUBLIC"
+                                  ? "🌐 Public"
+                                  : "🔒 Private"}
+                              </span>
                             </div>
                           </div>
                           <div className="text-center">
                             {/* action menu with centralized state */}
-                           
+
                             {/* <div className="text-center">
                               <button
                                 onClick={() => deleteNote(n.id)}
@@ -1959,62 +2077,56 @@ if (loading) {
                               </button>
                             </div> */}
 
+                            <div className="relative flex justify-center">
+                              <button
+                                onClick={() =>
+                                  setOpenActionMenu(
+                                    openActionMenu === `note-${n.id ?? idx}`
+                                      ? null
+                                      : `note-${n.id ?? idx}`,
+                                  )
+                                }
+                                className="p-1 rounded hover:bg-slate-100 text-gray-600"
+                              >
+                                ⋮
+                              </button>
 
-<div className="relative flex justify-center">
-  <button
-    onClick={() =>
-      setOpenActionMenu(
-        openActionMenu === `note-${n.id ?? idx}`
-          ? null
-          : `note-${n.id ?? idx}`
-      )
-    }
-    className="p-1 rounded hover:bg-slate-100 text-gray-600"
-  >
-    ⋮
-  </button>
+                              {openActionMenu === `note-${n.id ?? idx}` && (
+                                <div className="absolute right-0 top-8 w-32 bg-white border rounded-md shadow-md z-50">
+                                  <button
+                                    onClick={() => {
+                                      setNoteActionData(n);
+                                      setNoteActionMode("view");
+                                      setOpenActionMenu(null);
+                                    }}
+                                    className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
+                                  >
+                                    View
+                                  </button>
 
-  {openActionMenu === `note-${n.id ?? idx}` && (
-    <div className="absolute right-0 top-8 w-32 bg-white border rounded-md shadow-md z-50">
-      <button
-        onClick={() => {
-          setNoteActionData(n);
-          setNoteActionMode("view");
-          setOpenActionMenu(null);
-        }}
-        className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
-      >
-        View
-      </button>
+                                  <button
+                                    onClick={() => {
+                                      setNoteActionData(n);
+                                      setNoteActionMode("edit");
+                                      setOpenActionMenu(null);
+                                    }}
+                                    className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
+                                  >
+                                    Edit
+                                  </button>
 
-      <button
-        onClick={() => {
-          setNoteActionData(n);
-          setNoteActionMode("edit");
-          setOpenActionMenu(null);
-        }}
-        className="block w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
-      >
-        Edit
-      </button>
-
-      <button
-        onClick={() => {
-          deleteNote(n.id);
-          setOpenActionMenu(null);
-        }}
-        className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-gray-100"
-      >
-        Delete
-      </button>
-    </div>
-  )}
-</div>
-
-
-
-
-
+                                  <button
+                                    onClick={() => {
+                                      deleteNote(n.id);
+                                      setOpenActionMenu(null);
+                                    }}
+                                    className="block w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-gray-100"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -2030,9 +2142,19 @@ if (loading) {
                       onClick={openAddComment}
                       className="inline-flex items-center gap-2 text-blue-600"
                     >
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                      <svg
+                        className="w-5 h-5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                      >
                         <circle cx="12" cy="12" r="11" strokeWidth="1" />
-                        <path d="M12 8v8M8 12h8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <path
+                          d="M12 8v8M8 12h8"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
                       </svg>
                       Add a Comment
                     </button>
@@ -2047,28 +2169,44 @@ if (loading) {
 
                     <div>
                       {(!deal.comments || deal.comments.length === 0) && (
-                        <div className="p-6 text-sm text-gray-500">No comments yet.</div>
+                        <div className="p-6 text-sm text-gray-500">
+                          No comments yet.
+                        </div>
                       )}
 
-                      {deal.comments && deal.comments.length > 0 && deal.comments.map((c: any, idx: number) => (
-                        <div key={c.id || `${c.employeeId ?? "emp"}-${c.createdAt ?? idx}`} className="grid grid-cols-[140px_1fr_80px] items-start border-t p-4">
-                          <div className="text-sm text-gray-700">{
-                          // new Date(c.createdAt).toLocaleDateString()
-                          format(new Date(c.createdAt), "dd-MM-yyyy")
-                          }</div>
-                          <div className="text-sm text-gray-700">{c.commentText || "--"}</div>
-                          <div className="text-center">
-                            <button
-                              onClick={() => deleteComment(c.id)}
-                              disabled={commentDeletingId === c.id}
-                              className="text-red-600 hover:underline"
-                              aria-label="Delete comment"
-                            >
-                              {commentDeletingId === c.id ? "Deleting..." : "🗑️"}
-                            </button>
+                      {deal.comments &&
+                        deal.comments.length > 0 &&
+                        deal.comments.map((c: any, idx: number) => (
+                          <div
+                            key={
+                              c.id ||
+                              `${c.employeeId ?? "emp"}-${c.createdAt ?? idx}`
+                            }
+                            className="grid grid-cols-[140px_1fr_80px] items-start border-t p-4"
+                          >
+                            <div className="text-sm text-gray-700">
+                              {
+                                // new Date(c.createdAt).toLocaleDateString()
+                                format(new Date(c.createdAt), "dd-MM-yyyy")
+                              }
+                            </div>
+                            <div className="text-sm text-gray-700">
+                              {c.commentText || "--"}
+                            </div>
+                            <div className="text-center">
+                              <button
+                                onClick={() => deleteComment(c.id)}
+                                disabled={commentDeletingId === c.id}
+                                className="text-red-600 hover:underline"
+                                aria-label="Delete comment"
+                              >
+                                {commentDeletingId === c.id
+                                  ? "Deleting..."
+                                  : "🗑️"}
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
                     </div>
                   </div>
                 </div>
@@ -2077,10 +2215,23 @@ if (loading) {
               {activeTab === "tags" && (
                 <div>
                   <div className="mb-4">
-                    <button onClick={openAddTag} className="inline-flex items-center gap-2 text-blue-600">
-                      <svg className="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                    <button
+                      onClick={openAddTag}
+                      className="inline-flex items-center gap-2 text-blue-600"
+                    >
+                      <svg
+                        className="w-5 h-5"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                      >
                         <circle cx="12" cy="12" r="11" strokeWidth="1" />
-                        <path d="M12 8v8M8 12h8" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                        <path
+                          d="M12 8v8M8 12h8"
+                          strokeWidth="1.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
                       </svg>
                       Add a Tag
                     </button>
@@ -2096,30 +2247,42 @@ if (loading) {
                     <div>
                       {/* {tagsLoading && <div className="p-6 text-sm text-gray-500">Loading tags...</div>} */}
 
+                      {tagsLoading && (
+                        <div className="space-y-3 p-4">
+                          {[...Array(3)].map((_, i) => (
+                            <Skeleton key={i} height={20} />
+                          ))}
+                        </div>
+                      )}
 
-{tagsLoading && (
-  <div className="space-y-3 p-4">
-    {[...Array(3)].map((_, i) => (
-      <Skeleton key={i} height={20} />
-    ))}
-  </div>
-)}
-
-
-                      {tagsError && <div className="p-6 text-sm text-red-600">{tagsError}</div>}
+                      {tagsError && (
+                        <div className="p-6 text-sm text-red-600">
+                          {tagsError}
+                        </div>
+                      )}
 
                       {!tagsLoading && tags.length === 0 && (
-                        <div className="p-6 text-sm text-gray-500">No tags yet.</div>
+                        <div className="p-6 text-sm text-gray-500">
+                          No tags yet.
+                        </div>
                       )}
 
                       {tags.map((t, idx) => {
                         // t can be either TagItem or string (server inconsistency). Render name accordingly.
-                        const tagName = typeof t === "string" ? t : (t.tagName || "Untitled tag");
+                        const tagName =
+                          typeof t === "string"
+                            ? t
+                            : t.tagName || "Untitled tag";
                         const tagId = typeof t === "string" ? undefined : t.id;
                         const key = `${typeof t === "string" ? t : (t.id ?? t.tagName)}-${idx}`;
                         return (
-                          <div key={key} className="grid grid-cols-[1fr_80px] items-center border-t p-4">
-                            <div className="text-sm text-gray-700">{tagName}</div>
+                          <div
+                            key={key}
+                            className="grid grid-cols-[1fr_80px] items-center border-t p-4"
+                          >
+                            <div className="text-sm text-gray-700">
+                              {tagName}
+                            </div>
                             <div className="text-center">
                               <button
                                 onClick={() => deleteTag(tagId)}
@@ -2151,41 +2314,76 @@ if (loading) {
             <div className="space-y-3 text-sm text-gray-700">
               <div className="flex justify-between">
                 <span className="text-gray-500">Name</span>
-                <span className="text-gray-900">{deal.leadName || "—"}</span>
+                <span className="text-gray-900">{deal?.lead?.name || "—"}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Email</span>
-                <span className="text-gray-900">{deal.leadEmail || "—"}</span>
+                <span className="text-gray-900">
+                  {deal?.lead?.email || "—"}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Mobile</span>
-                <span className="text-gray-900">{deal.leadMobile || "—"}</span>
+                <span className="text-gray-900">
+                  {deal?.lead?.mobileNumber || "—"}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-500">Company Name</span>
-                <span className="text-gray-900">{(deal as any).leadCompany || "—"}</span>
+                <span className="text-gray-900">
+                  {(deal as any)?.lead?.companyName || "—"}
+                </span>
               </div>
 
               <div className="mt-4 flex gap-3">
                 <a
-                  href={deal.leadEmail ? `mailto:${deal.leadEmail}` : "#"}
-                  onClick={(e) => { if (!deal.leadEmail) e.preventDefault(); }}
+                  href={deal?.lead?.email ? `mailto:${deal?.lead?.email}` : "#"}
+                  onClick={(e) => {
+                    if (!deal.leadEmail) e.preventDefault();
+                  }}
                   className="inline-flex items-center gap-2 px-3 py-2 rounded-md border text-sm text-sky-600 hover:bg-sky-50"
                 >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M3 8l9 6 9-6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M21 19H3" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                  <svg
+                    className="w-4 h-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                  >
+                    <path
+                      d="M3 8l9 6 9-6"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                    <path
+                      d="M21 19H3"
+                      strokeWidth="1.5"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                   Email
                 </a>
 
                 <a
                   href={deal.leadMobile ? `tel:${deal.leadMobile}` : "#"}
-                  onClick={(e) => { if (!deal.leadMobile) e.preventDefault(); }}
+                  onClick={(e) => {
+                    if (!deal.leadMobile) e.preventDefault();
+                  }}
                   className="inline-flex items-center gap-2 px-3 py-2 rounded-md border text-sm text-sky-600 hover:bg-sky-50"
                 >
-                  <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                    <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.09 4.18 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.72c.12.9.36 1.77.72 2.58a2 2 0 0 1-.45 2.11L9.91 9.91a14 14 0 0 0 6 6l1.5-1.5a2 2 0 0 1 2.11-.45c.81.36 1.68.6 2.58.72A2 2 0 0 1 22 16.92z" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" />
+                  <svg
+                    className="w-4 h-4"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                  >
+                    <path
+                      d="M22 16.92v3a2 2 0 0 1-2.18 2 19.86 19.86 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6A19.86 19.86 0 0 1 2.09 4.18 2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.72c.12.9.36 1.77.72 2.58a2 2 0 0 1-.45 2.11L9.91 9.91a14 14 0 0 0 6 6l1.5-1.5a2 2 0 0 1 2.11-.45c.81.36 1.68.6 2.58.72A2 2 0 0 1 22 16.92z"
+                      strokeWidth="1"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
                   </svg>
                   Call
                 </a>
@@ -2200,13 +2398,21 @@ if (loading) {
       {/* Followup modal — styled like your screenshot */}
       {isFollowupModalOpen && editingFollowup && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20">
-          <div className="absolute inset-0 bg-black/40" onClick={closeFollowupModal} />
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={closeFollowupModal}
+          />
           <div className="relative bg-white w-full max-w-4xl rounded-2xl shadow-xl border p-6 mx-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-semibold">
                 {editingFollowup.id ? "Edit Follow Up" : "Add Follow Up"}
               </h3>
-              <button onClick={closeFollowupModal} className="text-gray-400 hover:text-gray-600">✕</button>
+              <button
+                onClick={closeFollowupModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
             </div>
 
             {/* big rounded inner card similar to screenshot */}
@@ -2215,11 +2421,18 @@ if (loading) {
 
               <div className="grid grid-cols-2 gap-6">
                 <div>
-                  <label className="text-sm text-gray-600">Next Follow Up *</label>
+                  <label className="text-sm text-gray-600">
+                    Next Follow Up *
+                  </label>
                   <input
                     type="date"
                     value={editingFollowup.nextDate}
-                    onChange={(e) => setEditingFollowup({ ...editingFollowup, nextDate: e.target.value })}
+                    onChange={(e) =>
+                      setEditingFollowup({
+                        ...editingFollowup,
+                        nextDate: e.target.value,
+                      })
+                    }
                     className="mt-2 block w-full rounded-md border px-3 py-2"
                   />
                 </div>
@@ -2229,7 +2442,12 @@ if (loading) {
                   <input
                     type="time"
                     value={editingFollowup.startTime}
-                    onChange={(e) => setEditingFollowup({ ...editingFollowup, startTime: e.target.value })}
+                    onChange={(e) =>
+                      setEditingFollowup({
+                        ...editingFollowup,
+                        startTime: e.target.value,
+                      })
+                    }
                     className="mt-2 block w-full rounded-md border px-3 py-2"
                   />
                 </div>
@@ -2240,13 +2458,22 @@ if (loading) {
                     <span
                       className={`inline-flex items-center gap-2 px-3 py-2 rounded-md border ${editingFollowup.status === "PENDING" ? "bg-yellow-50 border-yellow-200" : editingFollowup.status === "COMPLETED" ? "bg-green-50 border-green-200" : editingFollowup.status === "CANCELLED" ? "bg-gray-50 border-gray-200" : "bg-white"}`}
                     >
-                      <span className={`inline-block w-2 h-2 rounded-full ${editingFollowup.status === "PENDING" ? "bg-yellow-400" : editingFollowup.status === "COMPLETED" ? "bg-green-400" : editingFollowup.status === "CANCELLED" ? "bg-gray-400" : "bg-gray-300"}`} />
-                      <span className="text-sm">{editingFollowup.status ?? "PENDING"}</span>
+                      <span
+                        className={`inline-block w-2 h-2 rounded-full ${editingFollowup.status === "PENDING" ? "bg-yellow-400" : editingFollowup.status === "COMPLETED" ? "bg-green-400" : editingFollowup.status === "CANCELLED" ? "bg-gray-400" : "bg-gray-300"}`}
+                      />
+                      <span className="text-sm">
+                        {editingFollowup.status ?? "PENDING"}
+                      </span>
                     </span>
 
                     <select
                       value={editingFollowup.status}
-                      onChange={(e) => setEditingFollowup({ ...editingFollowup, status: e.target.value as any })}
+                      onChange={(e) =>
+                        setEditingFollowup({
+                          ...editingFollowup,
+                          status: e.target.value as any,
+                        })
+                      }
                       className="mt-0 block rounded-md border px-3 py-2"
                     >
                       <option value="PENDING">Pending</option>
@@ -2261,27 +2488,51 @@ if (loading) {
                     id="sendReminder"
                     type="checkbox"
                     checked={!!editingFollowup.sendReminder}
-                    onChange={(e) => setEditingFollowup({ ...editingFollowup, sendReminder: e.target.checked })}
+                    onChange={(e) =>
+                      setEditingFollowup({
+                        ...editingFollowup,
+                        sendReminder: e.target.checked,
+                      })
+                    }
                   />
-                  <label htmlFor="sendReminder" className="text-sm text-gray-700">Send Reminder</label>
+                  <label
+                    htmlFor="sendReminder"
+                    className="text-sm text-gray-700"
+                  >
+                    Send Reminder
+                  </label>
                 </div>
 
                 <div>
-                  <label className="block text-sm text-gray-600">Remind Before *</label>
+                  <label className="block text-sm text-gray-600">
+                    Remind Before *
+                  </label>
                   <input
                     type="number"
                     min={0}
                     value={editingFollowup.remindBefore ?? 1}
-                    onChange={(e) => setEditingFollowup({ ...editingFollowup, remindBefore: Number(e.target.value) })}
+                    onChange={(e) =>
+                      setEditingFollowup({
+                        ...editingFollowup,
+                        remindBefore: Number(e.target.value),
+                      })
+                    }
                     className="mt-2 block w-full rounded-md border px-3 py-2"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm text-gray-600">Days / Hours / Minutes</label>
+                  <label className="block text-sm text-gray-600">
+                    Days / Hours / Minutes
+                  </label>
                   <select
                     value={editingFollowup.remindUnit}
-                    onChange={(e) => setEditingFollowup({ ...editingFollowup, remindUnit: e.target.value })}
+                    onChange={(e) =>
+                      setEditingFollowup({
+                        ...editingFollowup,
+                        remindUnit: e.target.value,
+                      })
+                    }
                     className="mt-2 block w-full rounded-md border px-3 py-2"
                   >
                     <option value="DAYS">Days</option>
@@ -2294,7 +2545,12 @@ if (loading) {
                   <label className="block text-sm text-gray-600">Remark</label>
                   <textarea
                     value={editingFollowup.remarks}
-                    onChange={(e) => setEditingFollowup({ ...editingFollowup, remarks: e.target.value })}
+                    onChange={(e) =>
+                      setEditingFollowup({
+                        ...editingFollowup,
+                        remarks: e.target.value,
+                      })
+                    }
                     className="mt-2 block w-full rounded-md border px-3 py-2 min-h-[120px]"
                     placeholder="---"
                   />
@@ -2303,7 +2559,12 @@ if (loading) {
             </div>
 
             <div className="mt-4 flex justify-center gap-6">
-              <button onClick={closeFollowupModal} className="px-6 py-2 border rounded-md text-sm">Cancel</button>
+              <button
+                onClick={closeFollowupModal}
+                className="px-6 py-2 border rounded-md text-sm"
+              >
+                Cancel
+              </button>
               <button
                 onClick={saveFollowup}
                 disabled={followupSaving}
@@ -2319,11 +2580,19 @@ if (loading) {
       {/* Add People modal — styled like the screenshot */}
       {isAddPeopleOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20">
-          <div className="absolute inset-0 bg-black/40" onClick={closeAddPeopleModal} />
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={closeAddPeopleModal}
+          />
           <div className="relative bg-white w-full max-w-4xl rounded-2xl shadow-xl border p-6 mx-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-semibold">Add People</h3>
-              <button onClick={closeAddPeopleModal} className="text-gray-400 hover:text-gray-600">✕</button>
+              <button
+                onClick={closeAddPeopleModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
             </div>
 
             <div className="rounded-lg border p-6 mb-6">
@@ -2357,7 +2626,9 @@ if (loading) {
                   >
                     <option value="">-- All Departments --</option>
                     {departments.map((d) => (
-                      <option key={d} value={d}>{d}</option>
+                      <option key={d} value={d}>
+                        {d}
+                      </option>
                     ))}
                   </select>
                 </div>
@@ -2365,14 +2636,21 @@ if (loading) {
                 {/* Optional note row spanning 2 cols */}
                 <div className="col-span-2 text-sm text-gray-500">
                   <div className="mt-2">
-                    Tip: Choose department to filter the Name dropdown. If Department is left as <strong>All</strong>, all available employees will show.
+                    Tip: Choose department to filter the Name dropdown. If
+                    Department is left as <strong>All</strong>, all available
+                    employees will show.
                   </div>
                 </div>
               </div>
             </div>
 
             <div className="flex justify-center gap-6">
-              <button onClick={closeAddPeopleModal} className="px-6 py-2 border rounded-md text-sm">Cancel</button>
+              <button
+                onClick={closeAddPeopleModal}
+                className="px-6 py-2 border rounded-md text-sm"
+              >
+                Cancel
+              </button>
               <button
                 onClick={addEmployee}
                 disabled={peopleSaving || !selectedAddEmployeeId}
@@ -2388,41 +2666,72 @@ if (loading) {
       {/* Note Modal */}
       {isNoteModalOpen && editingNote && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20">
-          <div className="absolute inset-0 bg-black/40" onClick={closeNoteModal} />
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={closeNoteModal}
+          />
           <div className="relative bg-white w-full max-w-4xl rounded-2xl shadow-xl border p-6 mx-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-semibold">
-                {noteModalMode === "add" ? "Add Deal Note" : noteModalMode === "edit" ? "Edit Deal Note" : (editingNote.noteTitle || "View Note")}
+                {noteModalMode === "add"
+                  ? "Add Deal Note"
+                  : noteModalMode === "edit"
+                    ? "Edit Deal Note"
+                    : editingNote.noteTitle || "View Note"}
               </h3>
-              <button onClick={closeNoteModal} className="text-gray-400 hover:text-gray-600">✕</button>
+              <button
+                onClick={closeNoteModal}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
             </div>
 
             {noteModalMode === "view" ? (
               <div className="rounded-lg border p-6 mb-6">
-                <div className="text-sm font-medium mb-4">Deal Note Details</div>
+                <div className="text-sm font-medium mb-4">
+                  Deal Note Details
+                </div>
 
                 <div className="grid grid-cols-[220px_1fr] gap-4 text-sm text-gray-700">
                   <div className="text-gray-500">Note Title</div>
-                  <div className="text-gray-900">{editingNote.noteTitle || "—"}</div>
+                  <div className="text-gray-900">
+                    {editingNote.noteTitle || "—"}
+                  </div>
 
                   <div className="text-gray-500">Note Type </div>
-                  <div className="text-gray-900">{editingNote.noteType === "PUBLIC" ? "Public" : "Private"}</div>
+                  <div className="text-gray-900">
+                    {editingNote.noteType === "PUBLIC" ? "Public" : "Private"}
+                  </div>
 
                   <div className="text-gray-500">Note Detail</div>
-                  <div className="text-gray-900">{editingNote.noteDetails && editingNote.noteDetails.trim() ? editingNote.noteDetails : "---"}</div>
+                  <div className="text-gray-900">
+                    {editingNote.noteDetails && editingNote.noteDetails.trim()
+                      ? editingNote.noteDetails
+                      : "---"}
+                  </div>
                 </div>
               </div>
             ) : (
               <div className="rounded-lg border p-6 mb-6">
-                <div className="text-sm font-medium mb-4">Deal Note Details</div>
+                <div className="text-sm font-medium mb-4">
+                  Deal Note Details
+                </div>
 
                 <div className="grid grid-cols-2 gap-6">
                   <div>
-                    <label className="text-sm text-gray-600">Note Title *</label>
+                    <label className="text-sm text-gray-600">
+                      Note Title *
+                    </label>
                     <input
                       type="text"
                       value={editingNote.noteTitle}
-                      onChange={(e) => setEditingNote({ ...editingNote, noteTitle: e.target.value })}
+                      onChange={(e) =>
+                        setEditingNote({
+                          ...editingNote,
+                          noteTitle: e.target.value,
+                        })
+                      }
                       className="mt-2 block w-full rounded-md border px-3 py-2"
                     />
                   </div>
@@ -2436,7 +2745,12 @@ if (loading) {
                           name="noteType"
                           value="PUBLIC"
                           checked={editingNote.noteType === "PUBLIC"}
-                          onChange={() => setEditingNote({ ...editingNote, noteType: "PUBLIC" })}
+                          onChange={() =>
+                            setEditingNote({
+                              ...editingNote,
+                              noteType: "PUBLIC",
+                            })
+                          }
                         />
                         <span className="text-sm">Public</span>
                       </label>
@@ -2447,7 +2761,12 @@ if (loading) {
                           name="noteType"
                           value="PRIVATE"
                           checked={editingNote.noteType === "PRIVATE"}
-                          onChange={() => setEditingNote({ ...editingNote, noteType: "PRIVATE" })}
+                          onChange={() =>
+                            setEditingNote({
+                              ...editingNote,
+                              noteType: "PRIVATE",
+                            })
+                          }
                         />
                         <span className="text-sm">Private</span>
                       </label>
@@ -2455,10 +2774,17 @@ if (loading) {
                   </div>
 
                   <div className="col-span-2">
-                    <label className="block text-sm text-gray-600">Note Detail </label>
+                    <label className="block text-sm text-gray-600">
+                      Note Detail{" "}
+                    </label>
                     <textarea
                       value={editingNote.noteDetails}
-                      onChange={(e) => setEditingNote({ ...editingNote, noteDetails: e.target.value })}
+                      onChange={(e) =>
+                        setEditingNote({
+                          ...editingNote,
+                          noteDetails: e.target.value,
+                        })
+                      }
                       className="mt-2 block w-full rounded-md border px-3 py-2 min-h-[120px]"
                       placeholder="--"
                     />
@@ -2468,7 +2794,12 @@ if (loading) {
             )}
 
             <div className="mt-4 flex justify-center gap-6">
-              <button onClick={closeNoteModal} className="px-6 py-2 border rounded-md text-sm">Cancel</button>
+              <button
+                onClick={closeNoteModal}
+                className="px-6 py-2 border rounded-md text-sm"
+              >
+                Cancel
+              </button>
 
               {noteModalMode !== "view" && (
                 <button
@@ -2491,7 +2822,12 @@ if (loading) {
           <div className="relative bg-white w-full max-w-4xl rounded-2xl shadow-xl border p-6 mx-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-semibold">Add Tags</h3>
-              <button onClick={closeAddTag} className="text-gray-400 hover:text-gray-600">✕</button>
+              <button
+                onClick={closeAddTag}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
             </div>
 
             <div className="rounded-lg border p-6 mb-6">
@@ -2510,7 +2846,12 @@ if (loading) {
             </div>
 
             <div className="flex justify-center gap-6">
-              <button onClick={closeAddTag} className="px-6 py-2 border rounded-md text-sm">Cancel</button>
+              <button
+                onClick={closeAddTag}
+                className="px-6 py-2 border rounded-md text-sm"
+              >
+                Cancel
+              </button>
               <button
                 onClick={saveTag}
                 disabled={tagSaving}
@@ -2526,11 +2867,19 @@ if (loading) {
       {/* Add Comment Modal */}
       {isAddCommentOpen && (
         <div className="fixed inset-0 z-50 flex items-start justify-center pt-20">
-          <div className="absolute inset-0 bg-black/40" onClick={closeAddComment} />
+          <div
+            className="absolute inset-0 bg-black/40"
+            onClick={closeAddComment}
+          />
           <div className="relative bg-white w-full max-w-4xl rounded-2xl shadow-xl border p-6 mx-4">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-xl font-semibold">Add a Comment</h3>
-              <button onClick={closeAddComment} className="text-gray-400 hover:text-gray-600">✕</button>
+              <button
+                onClick={closeAddComment}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
             </div>
 
             <div className="rounded-lg border p-6 mb-6">
@@ -2544,7 +2893,12 @@ if (loading) {
             </div>
 
             <div className="mt-4 flex justify-center gap-6">
-              <button onClick={closeAddComment} className="px-6 py-2 border rounded-md text-sm">Cancel</button>
+              <button
+                onClick={closeAddComment}
+                className="px-6 py-2 border rounded-md text-sm"
+              >
+                Cancel
+              </button>
               <button
                 onClick={saveComment}
                 disabled={commentSaving}
@@ -2557,8 +2911,6 @@ if (loading) {
         </div>
       )}
 
-
-
       {editingFollowupData && (
         <EditFollowupModal
           dealId={dealId}
@@ -2566,30 +2918,24 @@ if (loading) {
           onClose={() => setEditingFollowupData(null)}
           onUpdated={(updated) => {
             setFollowups((prev) =>
-              prev.map((f) => (f.id === updated.id ? updated : f))
+              prev.map((f) => (f.id === updated.id ? updated : f)),
             );
           }}
         />
       )}
 
-
-
       {noteActionData && noteActionMode && (
-  <NoteActionModal
-    dealId={dealId}
-    note={noteActionData}
-    mode={noteActionMode}
-    onClose={() => {
-      setNoteActionData(null);
-      setNoteActionMode(null);
-    }}
-    onUpdated={fetchNotes}
-  />
-)}
-
-
-
-
+        <NoteActionModal
+          dealId={dealId}
+          note={noteActionData}
+          mode={noteActionMode}
+          onClose={() => {
+            setNoteActionData(null);
+            setNoteActionMode(null);
+          }}
+          onUpdated={fetchNotes}
+        />
+      )}
     </div>
   );
 }
