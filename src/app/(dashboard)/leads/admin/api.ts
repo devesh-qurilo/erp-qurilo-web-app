@@ -159,6 +159,8 @@ export interface ClientSubCategoryItem {
   id: number
   subCategoryName?: string
   name?: string
+  categoryId?: number | null
+  categoryName?: string | null
 }
 
 export interface LeadSourceItem {

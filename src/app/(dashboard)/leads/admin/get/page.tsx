@@ -148,7 +148,7 @@ function OwnerCell({ meta, fallback }: { meta?: EmployeeMeta; fallback?: string 
 
 type DealCategoryItem = { id: number; categoryName: string };
 type ClientCategoryItem = { id: number; categoryName: string };
-type ClientSubCategoryItem = { id: number; subCategoryName: string };
+type ClientSubCategoryItem = { id: number; subCategoryName: string; categoryId?: number | null; categoryName?: string | null };
 type LeadSourceItem = { id: number; name: string };
 
 type DealPayload = {
@@ -201,7 +201,12 @@ const defaultPipelines = PIPELINES;
     .map((item) => ({ id: item.id, categoryName: item.categoryName || item.name || "" }))
     .filter((item) => item.categoryName);
   const clientSubCategories: ClientSubCategoryItem[] = (clientSubCategoriesQuery.data ?? [])
-    .map((item) => ({ id: item.id, subCategoryName: item.subCategoryName || item.name || "" }))
+    .map((item) => ({
+      id: item.id,
+      subCategoryName: item.subCategoryName || item.name || "",
+      categoryId: item.categoryId ?? null,
+      categoryName: item.categoryName ?? null,
+    }))
     .filter((item) => item.subCategoryName);
   const leadSources: LeadSourceItem[] = (leadSourcesQuery.data ?? [])
     .map((item) => ({ id: item.id, name: item.name || "" }))
@@ -247,6 +252,16 @@ const defaultPipelines = PIPELINES;
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  const selectedClientCategory = clientCategories.find((category) => category.categoryName === payload.clientCategory);
+  const filteredClientSubCategories = payload.clientCategory
+    ? clientSubCategories.filter((subCategory) => {
+      if (selectedClientCategory?.id && subCategory.categoryId) {
+        return subCategory.categoryId === selectedClientCategory.id;
+      }
+      return subCategory.categoryName === payload.clientCategory;
+    })
+    : [];
+
   // watcher dropdown
   const [watcherDropdownOpen, setWatcherDropdownOpen] = useState(false);
   const [watcherFilter, setWatcherFilter] = useState("");
@@ -283,6 +298,7 @@ const defaultPipelines = PIPELINES;
   }, [onClose]);
 
   const update = (k: string, v: any) => setPayload((p) => ({ ...p, [k]: v }));
+  const updateClientCategory = (value: string) => setPayload((p) => ({ ...p, clientCategory: value, clientSubCategory: "" }));
   const updateDeal = (k: keyof DealPayload, v: any) => setPayload((p) => ({ ...p, deal: { ...(p.deal as DealPayload), [k]: v } }));
 
   const toggleWatcher = (id: string) => {
@@ -369,6 +385,11 @@ const defaultPipelines = PIPELINES;
   };
 
   const openAddModal = async (type: "clientCategory" | "clientSubCategory" | "leadSource" | "dealCategory") => {
+    if (type === "clientSubCategory" && !payload.clientCategory.trim()) {
+      alert("Please select a client category first.");
+      return;
+    }
+
     setAddModalOpen(type);
     setAddName("");
     setLoadingAddList(true);
@@ -381,7 +402,7 @@ const defaultPipelines = PIPELINES;
         setAddListItems(clientCategories);
       } else if (type === "clientSubCategory") {
         await clientSubCategoriesQuery.refetch();
-        setAddListItems(clientSubCategories);
+        setAddListItems(filteredClientSubCategories);
       } else {
         await dealCategoriesQuery.refetch();
         setAddListItems(dealCategories);
@@ -409,8 +430,16 @@ const defaultPipelines = PIPELINES;
           body = { categoryName: addName.trim(), name: addName.trim() };
           break;
         case "clientSubCategory":
+          if (!selectedClientCategory) {
+            throw new Error("Please select a client category first.");
+          }
           url = `${BASE}/clients/category/subcategory`;
-          body = { subCategoryName: addName.trim(), name: addName.trim() };
+          body = {
+            subCategoryName: addName.trim(),
+            name: addName.trim(),
+            categoryId: selectedClientCategory.id,
+            categoryName: selectedClientCategory.categoryName,
+          };
           break;
         case "dealCategory":
           url = `${BASE}/deals/dealCategory`;
@@ -435,7 +464,7 @@ const defaultPipelines = PIPELINES;
       } else if (type === "clientCategory") {
         await clientCategoriesQuery.refetch();
         const categoryValue = created.categoryName || created.name || addName.trim();
-        setPayload((p) => ({ ...p, clientCategory: categoryValue }));
+        setPayload((p) => ({ ...p, clientCategory: categoryValue, clientSubCategory: "" }));
       } else if (type === "clientSubCategory") {
         await clientSubCategoriesQuery.refetch();
         const subCategoryValue = created.subCategoryName || created.name || addName.trim();
@@ -513,7 +542,7 @@ const defaultPipelines = PIPELINES;
           <div>
             <label className="block text-xs text-left text-muted-foreground mb-1">Client Category *</label>
             <div className="flex gap-2">
-              <select className="flex-1 border rounded-md px-3 py-2 text-sm" value={payload.clientCategory} onChange={(e) => update("clientCategory", e.target.value)}>
+              <select className="flex-1 border rounded-md px-3 py-2 text-sm" value={payload.clientCategory} onChange={(e) => updateClientCategory(e.target.value)}>
                 <option value="">--</option>
                 {clientCategories.map((c) => <option key={c.id} value={c.categoryName}>{c.categoryName}</option>)}
               </select>
@@ -524,9 +553,9 @@ const defaultPipelines = PIPELINES;
           <div>
             <label className="block text-xs text-left text-muted-foreground mb-1">Client Sub Category *</label>
             <div className="flex gap-2">
-              <select className="flex-1 border rounded-md px-3 py-2 text-sm" value={payload.clientSubCategory} onChange={(e) => update("clientSubCategory", e.target.value)}>
+              <select className="flex-1 border rounded-md px-3 py-2 text-sm" value={payload.clientSubCategory} onChange={(e) => update("clientSubCategory", e.target.value)} disabled={!payload.clientCategory}>
                 <option value="">--</option>
-                {clientSubCategories.map((s) => <option key={s.id} value={s.subCategoryName}>{s.subCategoryName}</option>)}
+                {filteredClientSubCategories.map((s) => <option key={s.id} value={s.subCategoryName}>{s.subCategoryName}</option>)}
               </select>
               <button type="button" onClick={() => openAddModal("clientSubCategory")} className="px-3 py-2 rounded border text-sm">Add</button>
             </div>
@@ -790,7 +819,7 @@ Auto Convert lead to client when the deal stage is set to "WIN".</label>
                     </tr>
                   </thead>
                   <tbody>
-                    {(addListItems.length ? addListItems : addModalOpen === "clientCategory" ? clientCategories : addModalOpen === "clientSubCategory" ? clientSubCategories : addModalOpen === "leadSource" ? leadSources : dealCategories).map((item: any, i: number) => (
+                    {(addListItems.length ? addListItems : addModalOpen === "clientCategory" ? clientCategories : addModalOpen === "clientSubCategory" ? filteredClientSubCategories : addModalOpen === "leadSource" ? leadSources : dealCategories).map((item: any, i: number) => (
                       <tr key={i} className="border-t">
                         <td className="p-2">{i + 1}</td>
                         <td className="p-2">{item.subCategoryName || item.categoryName || item.name}</td>
@@ -799,7 +828,7 @@ Auto Convert lead to client when the deal stage is set to "WIN".</label>
                         </td>
                       </tr>
                     ))}
-                    {(!addListItems.length && !(addModalOpen === "clientCategory" ? clientCategories.length : addModalOpen === "clientSubCategory" ? clientSubCategories.length : addModalOpen === "leadSource" ? leadSources.length : dealCategories.length)) && (
+                    {(!addListItems.length && !(addModalOpen === "clientCategory" ? clientCategories.length : addModalOpen === "clientSubCategory" ? filteredClientSubCategories.length : addModalOpen === "leadSource" ? leadSources.length : dealCategories.length)) && (
                       <tr>
                         <td colSpan={3} className="p-4 text-sm text-muted-foreground">No items found.</td>
                       </tr>
@@ -1695,7 +1724,12 @@ function UpdateLeadForm({
         if (clientSubCategoryRes.ok) {
           const json = await clientSubCategoryRes.json();
           if (Array.isArray(json)) {
-            setClientSubCategories(json.map((item: any) => ({ id: item.id, subCategoryName: item.subCategoryName || item.name || "" })).filter((item: ClientSubCategoryItem) => item.subCategoryName));
+            setClientSubCategories(json.map((item: any) => ({
+              id: item.id,
+              subCategoryName: item.subCategoryName || item.name || "",
+              categoryId: item.categoryId ?? null,
+              categoryName: item.categoryName ?? item.category?.name ?? null,
+            })).filter((item: ClientSubCategoryItem) => item.subCategoryName));
           }
         }
       } catch { }
@@ -1710,6 +1744,20 @@ function UpdateLeadForm({
   }, [onClose]);
 
   const update = (k: keyof typeof form, v: any) => setForm((s) => ({ ...s, [k]: v }));
+  const updateClientCategory = (value: string) => setForm((s) => ({ ...s, clientCategory: value, clientSubCategory: "" }));
+
+  const selectedClientCategory = clientCategories.find((category) => category.categoryName === form.clientCategory);
+  const filteredClientSubCategories = form.clientCategory
+    ? clientSubCategories.filter((subCategory) => {
+      if (selectedClientCategory?.id && subCategory.categoryId) {
+        return subCategory.categoryId === selectedClientCategory.id;
+      }
+      return subCategory.categoryName === form.clientCategory;
+    })
+    : [];
+  const shouldShowLegacySubCategory =
+    Boolean(form.clientSubCategory) &&
+    !filteredClientSubCategories.some((subCategory) => subCategory.subCategoryName === form.clientSubCategory);
 
   const validate = () => {
     if (!form.name.trim() || !form.email.trim()) return "Name and Email are required.";
@@ -1740,7 +1788,7 @@ function UpdateLeadForm({
         autoConvertToClient: !!form.autoConvertToClient,
         companyName: form.companyName || undefined,
         officialWebsite: form.officialWebsite || undefined,
-        mobileNumber: form.mobileNumber ? Number(form.mobileNumber) : undefined,
+        mobileNumber: form.mobileNumber || undefined,
         officePhone: form.officePhone || undefined,
         city: form.city || undefined,
         state: form.state || undefined,
@@ -1809,7 +1857,7 @@ function UpdateLeadForm({
                   <select
                     className="w-full border rounded-md p-2"
                     value={form.clientCategory}
-                    onChange={(e) => update("clientCategory", e.target.value)}
+                    onChange={(e) => updateClientCategory(e.target.value)}
                   >
                     <option value="">--</option>
                     {clientCategories.map((category) => (
@@ -1824,9 +1872,13 @@ function UpdateLeadForm({
                     className="w-full border rounded-md p-2"
                     value={form.clientSubCategory}
                     onChange={(e) => update("clientSubCategory", e.target.value)}
+                    disabled={!form.clientCategory}
                   >
                     <option value="">--</option>
-                    {clientSubCategories.map((subCategory) => (
+                    {shouldShowLegacySubCategory ? (
+                      <option value={form.clientSubCategory}>{form.clientSubCategory}</option>
+                    ) : null}
+                    {filteredClientSubCategories.map((subCategory) => (
                       <option key={subCategory.id} value={subCategory.subCategoryName}>{subCategory.subCategoryName}</option>
                     ))}
                   </select>
@@ -2015,6 +2067,3 @@ function UpdateLeadForm({
 
 
 }
-
-
-
