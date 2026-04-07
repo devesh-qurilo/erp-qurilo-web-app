@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -13,7 +12,11 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
@@ -25,11 +28,8 @@ import {
   type PriorityItem,
 } from "../api";
 
-
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
-
-
 
 import {
   Table,
@@ -56,16 +56,7 @@ import {
 import ImportButton from "@/components/ImportButton";
 import ExportButton from "@/components/ExportButton";
 
-
-
-const DEFAULT_STAGES = [
-  "generated",
-  "qualified",
-  "proposal",
-  "WIN",
-  "LOST",
-];
-
+const DEFAULT_STAGES = ["generated", "qualified", "proposal", "WIN", "LOST"];
 
 type Followup = {
   id: number;
@@ -122,14 +113,11 @@ type Deal = {
   priority?: string | number | PriorityObject | null;
 };
 
-
 const BASE_URL = `${process.env.NEXT_PUBLIC_MAIN}`;
 
 // Use uploaded images as fallback avatars (local paths provided earlier)
 const sampleDesktopImage = "/mnt/data/Screenshot 2025-11-21 122016.png";
 const sampleMobileImage = "/mnt/data/Screenshot 2025-11-21 122307.png";
-
-
 
 // export const FiltersDrawer = ({ open, onClose }: { open: boolean; onClose: () => void }) => {
 // export const FiltersDrawer = ({
@@ -200,7 +188,6 @@ export const FiltersDrawer = ({
   priorityFilter: string;
   setPriorityFilter: any;
 }) => {
-
   // const [dateFilterOn, setDateFilterOn] = useState<"created" | "close">("created");
   // const [dateFrom, setDateFrom] = useState<Date | undefined>();
   // const [dateTo, setDateTo] = useState<Date | undefined>();
@@ -213,10 +200,6 @@ export const FiltersDrawer = ({
   // const [tagFilter, setTagFilter] = useState("all");
   // const [priorityFilter, setPriorityFilter] = useState("all");
 
-
-
-
-
   return (
     <div className="fixed inset-0 z-50 flex">
       {/* overlay */}
@@ -225,14 +208,10 @@ export const FiltersDrawer = ({
       onClick={() => setOpenFilters(false)}
     /> */}
 
-      <div
-        className="fixed inset-0 bg-black/30"
-        onClick={onClose}
-      />
+      <div className="fixed inset-0 bg-black/30" onClick={onClose} />
 
       {/* drawer */}
       <div className="relative ml-auto h-full w-[340px] bg-white shadow-xl p-6 overflow-y-auto">
-
         {/* HEADER */}
         <div className="flex items-center justify-between mb-6 border-b pb-4">
           <div className="flex items-center gap-2 font-medium text-lg">
@@ -245,10 +224,7 @@ export const FiltersDrawer = ({
         >
           ×
         </button> */}
-          <button
-            onClick={onClose}
-            className="text-gray-500 text-lg"
-          >
+          <button onClick={onClose} className="text-gray-500 text-lg">
             ×
           </button>
         </div>
@@ -256,7 +232,10 @@ export const FiltersDrawer = ({
         {/* Date Filter On */}
         <div className="mb-6">
           <div className="text-sm mb-2">Date Filter On</div>
-          <Select value={dateFilterOn} onValueChange={(v) => setDateFilterOn(v as any)}>
+          <Select
+            value={dateFilterOn}
+            onValueChange={(v) => setDateFilterOn(v as any)}
+          >
             <SelectTrigger className="bg-white">
               <SelectValue />
             </SelectTrigger>
@@ -293,15 +272,11 @@ export const FiltersDrawer = ({
   <SelectItem value="Qualified">Qualified</SelectItem>
 )} */}
 
-
-
               {stages.map((stage) => (
                 <SelectItem key={stage} value={stage}>
                   {stage}
                 </SelectItem>
               ))}
-
-
             </SelectContent>
           </Select>
         </div>
@@ -337,11 +312,13 @@ export const FiltersDrawer = ({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All</SelectItem>
-              {[...new Set(
-                (deals as Deal[])
-                  .map((d) => d.dealAgentMeta?.name)
-                  .filter(Boolean)
-              )].map((name) => (
+              {[
+                ...new Set(
+                  (deals as Deal[])
+                    .map((d) => d.dealAgentMeta?.name)
+                    .filter(Boolean),
+                ),
+              ].map((name) => (
                 <SelectItem key={name} value={name!}>
                   {name}
                 </SelectItem>
@@ -359,11 +336,13 @@ export const FiltersDrawer = ({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All</SelectItem>
-              {[...new Map(
-                (deals as Deal[])
-                  .flatMap((d) => d.dealWatchersMeta || [])
-                  .map((w) => [w.employeeId, w])
-              ).values()].map((w) => (
+              {[
+                ...new Map(
+                  (deals as Deal[])
+                    .flatMap((d) => d.dealWatchersMeta || [])
+                    .map((w) => [w.employeeId, w]),
+                ).values(),
+              ].map((w) => (
                 <SelectItem key={w.employeeId} value={w.employeeId!}>
                   {w.name}
                 </SelectItem>
@@ -381,11 +360,13 @@ export const FiltersDrawer = ({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All</SelectItem>
-              {[...new Map(
-                (deals as Deal[])
-                  .filter((d) => d.leadId)
-                  .map((d) => [d.leadId, d])
-              ).values()].map((d) => (
+              {[
+                ...new Map(
+                  (deals as Deal[])
+                    .filter((d) => d.leadId)
+                    .map((d) => [d.leadId, d]),
+                ).values(),
+              ].map((d) => (
                 <SelectItem key={d.leadId} value={String(d.leadId)}>
                   {d.leadName}
                 </SelectItem>
@@ -403,13 +384,13 @@ export const FiltersDrawer = ({
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All</SelectItem>
-              {[...new Set(
-                (deals as Deal[]).flatMap((d) => d.tags || [])
-              )].map((tag) => (
-                <SelectItem key={tag} value={tag}>
-                  {tag}
-                </SelectItem>
-              ))}
+              {[...new Set((deals as Deal[]).flatMap((d) => d.tags || []))].map(
+                (tag) => (
+                  <SelectItem key={tag} value={tag}>
+                    {tag}
+                  </SelectItem>
+                ),
+              )}
             </SelectContent>
           </Select>
         </div>
@@ -432,15 +413,9 @@ export const FiltersDrawer = ({
               </SelectItem>
             ))} */}
 
-
-
-
               {[
                 ...new Map(
-                  priorities.map((p) => [
-                    String(p.status).toLowerCase(),
-                    p,
-                  ])
+                  priorities.map((p) => [String(p.status).toLowerCase(), p]),
                 ).values(),
               ].map((p) => (
                 <SelectItem
@@ -450,8 +425,6 @@ export const FiltersDrawer = ({
                   {p.status}
                 </SelectItem>
               ))}
-
-
             </SelectContent>
           </Select>
         </div>
@@ -478,9 +451,8 @@ export const FiltersDrawer = ({
         </div>
       </div>
     </div>
-  )
-}
-
+  );
+};
 
 export default function DealsPage() {
   const [token, setToken] = useState<string | null>(null);
@@ -501,7 +473,9 @@ export default function DealsPage() {
   const [openFilters, setOpenFilters] = useState(false);
 
   // filter form state
-  const [dateFilterOn, setDateFilterOn] = useState<"created" | "close">("created");
+  const [dateFilterOn, setDateFilterOn] = useState<"created" | "close">(
+    "created",
+  );
   const [minValue, setMinValue] = useState("");
   const [maxValue, setMaxValue] = useState("");
   const [agentFilter, setAgentFilter] = useState("all");
@@ -515,10 +489,6 @@ export default function DealsPage() {
 
   // UI state for deal stage filter (not currently wired to API calls, but can be used to filter displayed results on client side)
   const [dealStageFilter, setDealStageFilter] = useState("all");
-
-
-
-
 
   useEffect(() => {
     const t =
@@ -535,7 +505,8 @@ export default function DealsPage() {
     refetch: refetchDeals,
   } = useDealsQuery({ enabled: Boolean(token) });
 
-  const { data: priorities = [], error: prioritiesError } = useDealPrioritiesQuery({ enabled: Boolean(token) });
+  const { data: priorities = [], error: prioritiesError } =
+    useDealPrioritiesQuery({ enabled: Boolean(token) });
   const updateDealStageMutation = useUpdateDealStageMutation();
   const mutateDeals = async () => {
     await refetchDeals();
@@ -565,7 +536,6 @@ export default function DealsPage() {
   //   return Array.from(s.values()).sort();
   // }, [deals]);
 
-
   const stages = useMemo(() => {
     const apiStages = new Set<string>();
 
@@ -574,12 +544,8 @@ export default function DealsPage() {
     }
 
     // 🔥 merge default + api
-    return Array.from(
-      new Set([...DEFAULT_STAGES, ...Array.from(apiStages)])
-    );
+    return Array.from(new Set([...DEFAULT_STAGES, ...Array.from(apiStages)]));
   }, [deals]);
-
-
 
   // derive pipeline values for the top nav dropdown (UI only)
   const pipelines = useMemo(() => {
@@ -597,19 +563,19 @@ export default function DealsPage() {
       .filter((f) => f?.nextDate)
       .sort(
         (a, b) =>
-          new Date(a.nextDate!).getTime() -
-          new Date(b.nextDate!).getTime()
+          new Date(a.nextDate!).getTime() - new Date(b.nextDate!).getTime(),
       )[0];
   };
 
-  const formatDealTags = (tags?: Array<string | { tagName?: string | null }> | null) => {
+  const formatDealTags = (
+    tags?: Array<string | { tagName?: string | null }> | null,
+  ) => {
     if (!Array.isArray(tags) || tags.length === 0) return "—";
     const names = tags
       .map((tag) => (typeof tag === "string" ? tag : tag?.tagName || ""))
       .filter(Boolean);
     return names.length > 0 ? names.join(", ") : "—";
   };
-
 
   const normalizePriorityString = (p?: unknown) => {
     if (p === null || p === undefined) return "low";
@@ -632,13 +598,10 @@ export default function DealsPage() {
     const q = query.trim().toLowerCase();
 
     return (deals as Deal[]).filter((d) => {
-
       const matchesStage =
         dealStageFilter === "all" ||
         String(d.dealStage || "").toLowerCase() ===
-        dealStageFilter.toLowerCase();
-
-
+          dealStageFilter.toLowerCase();
 
       /* ---------------- SEARCH ---------------- */
       const hay = [
@@ -658,14 +621,10 @@ export default function DealsPage() {
 
       const matchesQuery = q.length === 0 || hay.includes(q);
 
-
-
       /* ---------------- PIPELINE FILTER ---------------- */
       const matchesPipeline =
         pipelineFilter === "all" ||
-        String(d.pipeline || "").toLowerCase() ===
-        pipelineFilter.toLowerCase();
-
+        String(d.pipeline || "").toLowerCase() === pipelineFilter.toLowerCase();
 
       /* ---------------- DATE FILTER ---------------- */
       let dateToCheck: Date | null = null;
@@ -688,10 +647,7 @@ export default function DealsPage() {
       if (maxValue && dealValue > Number(maxValue)) return false;
 
       /* ---------------- AGENT FILTER ---------------- */
-      if (
-        agentFilter !== "all" &&
-        d.dealAgentMeta?.name !== agentFilter
-      ) {
+      if (agentFilter !== "all" && d.dealAgentMeta?.name !== agentFilter) {
         return false;
       }
 
@@ -703,8 +659,7 @@ export default function DealsPage() {
 
       /* ---------------- WATCHER FILTER ---------------- */
       if (watcherFilter !== "all") {
-        const watcherIds =
-          d.dealWatchersMeta?.map((w) => w.employeeId) || [];
+        const watcherIds = d.dealWatchersMeta?.map((w) => w.employeeId) || [];
         if (!watcherIds.includes(watcherFilter)) return false;
       }
 
@@ -714,20 +669,11 @@ export default function DealsPage() {
       }
 
       /* ---------------- TAG FILTER ---------------- */
-      if (
-        tagFilter !== "all" &&
-        !(d.tags || []).includes(tagFilter)
-      ) {
+      if (tagFilter !== "all" && !(d.tags || []).includes(tagFilter)) {
         return false;
       }
 
-      return (
-        matchesStage &&
-        matchesQuery &&
-        matchesDate &&
-        matchesPipeline
-
-      );
+      return matchesStage && matchesQuery && matchesDate && matchesPipeline;
     });
   }, [
     deals,
@@ -748,9 +694,7 @@ export default function DealsPage() {
     priorityFilter,
   ]);
 
-
-
-
+  console.log("filter", filteredDeals);
 
   // if (dealsLoading) {
   //   return (
@@ -760,12 +704,9 @@ export default function DealsPage() {
   //   );
   // }
 
-
-
   if (dealsLoading) {
     return (
       <main className="container mx-auto max-w-6xl px-4 py-8">
-
         {/* Top bar skeleton */}
         <div className="mb-4 flex justify-between items-center">
           <Skeleton width={200} height={30} />
@@ -815,11 +756,21 @@ export default function DealsPage() {
                     </div>
                   </TableCell>
 
-                  <TableCell><Skeleton width={100} /></TableCell>
-                  <TableCell><Skeleton width={120} /></TableCell>
-                  <TableCell><Skeleton width={80} /></TableCell>
-                  <TableCell><Skeleton width={90} /></TableCell>
-                  <TableCell><Skeleton width={100} /></TableCell>
+                  <TableCell>
+                    <Skeleton width={100} />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton width={120} />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton width={80} />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton width={90} />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton width={100} />
+                  </TableCell>
 
                   <TableCell>
                     <div className="flex items-center gap-2">
@@ -828,11 +779,21 @@ export default function DealsPage() {
                     </div>
                   </TableCell>
 
-                  <TableCell><Skeleton width={100} /></TableCell>
-                  <TableCell><Skeleton width={90} /></TableCell>
-                  <TableCell><Skeleton width={90} /></TableCell>
-                  <TableCell><Skeleton width={80} /></TableCell>
-                  <TableCell><Skeleton width={30} /></TableCell>
+                  <TableCell>
+                    <Skeleton width={100} />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton width={90} />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton width={90} />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton width={80} />
+                  </TableCell>
+                  <TableCell>
+                    <Skeleton width={30} />
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -842,9 +803,6 @@ export default function DealsPage() {
     );
   }
 
-
-
-
   if (dealsError) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center text-lg font-semibold text-destructive">
@@ -853,9 +811,6 @@ export default function DealsPage() {
       </div>
     );
   }
-
-
-
 
   const getPriorityColor = (p?: unknown) => {
     if (
@@ -883,16 +838,15 @@ export default function DealsPage() {
     }
   };
 
-
   const handlePriorityAssign = async (
     dealId: number | string,
-    priorityId: number
+    priorityId: number,
   ) => {
     if (!token) return;
 
     try {
       const currentDeal = (deals as Deal[]).find(
-        (d) => String(d.id) === String(dealId)
+        (d) => String(d.id) === String(dealId),
       );
       const hasExistingPriority =
         currentDeal?.priority !== null &&
@@ -907,7 +861,7 @@ export default function DealsPage() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({ priorityId }),
-        }
+        },
       );
 
       if (!res.ok && hasExistingPriority && res.status === 404) {
@@ -935,15 +889,16 @@ export default function DealsPage() {
     }
   };
 
-
-
   const handleStageChange = async (
     dealId: number | string,
     newStage: string,
   ) => {
     if (!token) return;
     try {
-      await updateDealStageMutation.mutateAsync({ id: dealId, stage: newStage });
+      await updateDealStageMutation.mutateAsync({
+        id: dealId,
+        stage: newStage,
+      });
       await mutateDeals();
     } catch (err) {
       console.error("Error updating stage:", err);
@@ -952,8 +907,6 @@ export default function DealsPage() {
 
   // DELETE deal
   const handleDeleteDeal = async (dealId: number | string) => {
-
-
     try {
       console.log("delete devesh", dealId);
       const res = await fetch(`${BASE_URL}/deals/${dealId}`, {
@@ -1003,7 +956,9 @@ export default function DealsPage() {
 
                   {/* START DATE */}
                   <div className="space-y-1">
-                    <div className="text-xs text-muted-foreground">Start Date</div>
+                    <div className="text-xs text-muted-foreground">
+                      Start Date
+                    </div>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
@@ -1034,7 +989,9 @@ export default function DealsPage() {
 
                   {/* END DATE */}
                   <div className="space-y-1">
-                    <div className="text-xs text-muted-foreground">End Date</div>
+                    <div className="text-xs text-muted-foreground">
+                      End Date
+                    </div>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
@@ -1042,9 +999,7 @@ export default function DealsPage() {
                           className="w-full justify-between font-normal"
                           disabled={!dateFrom}
                         >
-                          {dateTo
-                            ? format(dateTo, "dd-MM-yyyy")
-                            : "dd-mm-yyyy"}
+                          {dateTo ? format(dateTo, "dd-MM-yyyy") : "dd-mm-yyyy"}
                           <CalendarIcon className="h-4 w-4" />
                         </Button>
                       </PopoverTrigger>
@@ -1076,10 +1031,6 @@ export default function DealsPage() {
               </PopoverContent>
             </Popover>
 
-
-
-
-
             <div className="text-xs text-muted-foreground">Pipeline </div>
             <Select value={pipelineFilter} onValueChange={setPipelineFilter}>
               <SelectTrigger className="w-36 text-sm py-1">
@@ -1107,15 +1058,12 @@ export default function DealsPage() {
           <div className="flex items-center gap-2">
             {/* <Button variant="ghost" size="sm" className="px-2"> */}
 
-
             <Button
               variant="ghost"
               size="sm"
               className="px-2"
               onClick={() => setOpenFilters(true)}
             >
-
-
               <div className="flex items-center gap-2">
                 <SlidersHorizontal className="h-4 w-4" />
                 <span className="text-sm">Filters </span>
@@ -1127,7 +1075,7 @@ export default function DealsPage() {
         {/* Header row: Add Deal left, search + view toggles right (matches image layout) */}
         <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-4">
-            <Button asChild >
+            <Button asChild>
               <Link href="/deals/create">+ Add Deal</Link>
             </Button>
 
@@ -1214,13 +1162,28 @@ export default function DealsPage() {
                 //   ? new Date(nextFollowUp).toLocaleDateString()
                 //   : "—";
 
-                const watchersNames =
-                  deal.dealWatchersMeta && deal.dealWatchersMeta.length > 0
-                    ? deal.dealWatchersMeta
-                      .map((w) => w.name)
-                      .filter(Boolean)
-                      .join(", ")
-                    : (deal.dealWatchers || []).join(", ") || "—";
+                // const watchersNames =
+                //   deal.dealWatchersMeta && deal.dealWatchersMeta.length > 0
+                //     ? deal.dealWatchersMeta
+                //         .map((w) => w.name)
+                //         .filter(Boolean)
+                //         .join(", ")
+                //     : (deal.dealWatchers || []).join(", ") || "—";
+
+                const watchersNames = (() => {
+                  const names =
+                    deal.dealWatchersMeta && deal.dealWatchersMeta.length > 0
+                      ? deal.dealWatchersMeta.map((w) => w.name)
+                      : deal.dealWatchers || [];
+
+                  const uniqueNames = [...names.filter(Boolean)];
+
+                  if (uniqueNames.length === 0) return "—";
+
+                  if (uniqueNames.length === 1) return uniqueNames[0];
+
+                  return `${uniqueNames[0]} +${uniqueNames.length - 1}`;
+                })();
 
                 let prioritySelectValue: string;
                 if (
@@ -1250,15 +1213,9 @@ export default function DealsPage() {
                     : String(deal.priority);
                 }
 
-
-
                 const selectedPriority = priorities.find(
-                  (p) => String(p.id) === prioritySelectValue
+                  (p) => String(p.id) === prioritySelectValue,
                 );
-
-
-
-
 
                 const priorityColor = getPriorityColor(deal.priority);
 
@@ -1288,17 +1245,17 @@ export default function DealsPage() {
                             {deal.title || "—"}
                           </Link>
                           <div className="text-xs text-muted-foreground">
-                            ID:  {deal.id}
+                            ID: {deal.id}
                           </div>
                         </div>
                       </div>
                     </TableCell>
 
-                    <TableCell>{deal.leadName || "—"}</TableCell>
+                    <TableCell>{deal?.lead?.name || "—"}</TableCell>
 
                     <TableCell className="text-sm text-muted-foreground">
-                      <div>{deal.leadEmail || "—"}</div>
-                      <div>{deal.leadMobile || "—"}</div>
+                      <div>{deal?.lead?.email || "—"}</div>
+                      <div>{deal?.lead?.mobileNumber || "—"}</div>
                     </TableCell>
 
                     <TableCell className="whitespace-nowrap">
@@ -1308,17 +1265,10 @@ export default function DealsPage() {
                     </TableCell>
 
                     <TableCell>
-                      {/* {deal.expectedCloseDate
-                        ? new Date(deal.expectedCloseDate).toLocaleDateString()
-                        : "—"} */}
-
                       {deal.expectedCloseDate
                         ? format(new Date(deal.expectedCloseDate), "dd-MM-yyyy")
                         : "—"}
-
                     </TableCell>
-
-                    {/* <TableCell>{nextFollowUpDisplay}</TableCell> */}
 
                     <TableCell>
                       {nextFollowup ? (
@@ -1330,18 +1280,15 @@ export default function DealsPage() {
                           }}
                           className=" text-sm hover:text-blue-800"
                         >
-                          {/* {new Date(nextFollowup.nextDate!).toLocaleDateString()} */}
-                          {format(new Date(nextFollowup.nextDate!), "dd-MM-yyyy")}
-
+                          {format(
+                            new Date(nextFollowup.nextDate!),
+                            "dd-MM-yyyy",
+                          )}
                         </button>
                       ) : (
                         "—"
                       )}
                     </TableCell>
-
-
-
-
 
                     <TableCell>
                       <div className="flex items-center gap-3">
@@ -1386,32 +1333,11 @@ export default function DealsPage() {
                           />
                         </SelectTrigger>
                         <SelectContent>
-                          {/* {stages.length ? (
-                            stages.map((s) => (
-                              <SelectItem key={s} value={s}>
-                                {s}
-                              </SelectItem>
-                            ))
-                          ) : (
-                            <>
-                              <SelectItem value="Qualified">
-                                Qualified
-                              </SelectItem>
-                              <SelectItem value="WIN">Win</SelectItem>
-                              <SelectItem value="LOST">Lost</SelectItem>
-                            </>
-                          )} */}
-
-
-
-
                           {stages.map((s) => (
                             <SelectItem key={s} value={s}>
                               {s}
                             </SelectItem>
                           ))}
-
-
                         </SelectContent>
                       </Select>
                     </TableCell>
@@ -1431,22 +1357,15 @@ export default function DealsPage() {
                               const toSend = !Number.isNaN(asNum)
                                 ? asNum
                                 : (() => {
-                                  const resolved = priorityByStatus.get(
-                                    String(val).toLowerCase(),
-                                  );
-                                  return resolved ? resolved.id : null;
-                                })();
+                                    const resolved = priorityByStatus.get(
+                                      String(val).toLowerCase(),
+                                    );
+                                    return resolved ? resolved.id : null;
+                                  })();
                               if (toSend !== null)
                                 handlePriorityAssign(deal.id, toSend);
                             }}
                           >
-                            {/* <SelectTrigger
-                              className="w-32 text-sm py-1"
-                              aria-label="Priority status"
-                            >
-                              <SelectValue placeholder="Priority" />
-                            </SelectTrigger> */}
-
                             <SelectTrigger
                               className="w-32 text-sm py-1"
                               aria-label="Priority status"
@@ -1455,7 +1374,9 @@ export default function DealsPage() {
                                 <div className="flex items-center gap-2">
                                   <span
                                     className="inline-block w-2 h-2 rounded-full"
-                                    style={{ backgroundColor: selectedPriority.color }}
+                                    style={{
+                                      backgroundColor: selectedPriority.color,
+                                    }}
                                   />
                                   <span className="text-sm">
                                     {selectedPriority.status}
@@ -1468,20 +1389,18 @@ export default function DealsPage() {
                               )}
                             </SelectTrigger>
 
-
-
                             <SelectContent>
                               {(priorities && priorities.length > 0
                                 ? priorities
                                 : [
-                                  { id: 3, status: "Low", color: "#10b981" },
-                                  {
-                                    id: 4,
-                                    status: "Medium",
-                                    color: "#f59e0b",
-                                  },
-                                  { id: 1, status: "High", color: "#ef4444" },
-                                ]
+                                    { id: 3, status: "Low", color: "#10b981" },
+                                    {
+                                      id: 4,
+                                      status: "Medium",
+                                      color: "#f59e0b",
+                                    },
+                                    { id: 1, status: "High", color: "#ef4444" },
+                                  ]
                               ).map((p: PriorityItem) => (
                                 <SelectItem key={p.id} value={String(p.id)}>
                                   <div className="flex items-center gap-2">
@@ -1500,7 +1419,11 @@ export default function DealsPage() {
                     </TableCell>
 
                     <TableCell className="text-sm text-muted-foreground">
-                      {formatDealTags(deal.tags as Array<string | { tagName?: string | null }> | null)}
+                      {formatDealTags(
+                        deal.tags as Array<
+                          string | { tagName?: string | null }
+                        > | null,
+                      )}
                     </TableCell>
 
                     <TableCell className="text-right">
@@ -1511,51 +1434,51 @@ export default function DealsPage() {
                               <MoreVertical className="h-4 w-4" />
                             </Button>
                           </DropdownMenuTrigger>
-                          {deal?.dealStage.trim().toLowerCase() === "win" ? <DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <Link href={`/deals/get/${deal.id}`}>View</Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link href={`/deals/create/${deal.id}`}>
-                                Edit
-                              </Link>
-                            </DropdownMenuItem>
+                          {deal?.dealStage.trim().toLowerCase() === "win" ? (
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem asChild>
+                                <Link href={`/deals/get/${deal.id}`}>View</Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild>
+                                <Link href={`/deals/create/${deal.id}`}>
+                                  Edit
+                                </Link>
+                              </DropdownMenuItem>
 
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => handleDeleteDeal(deal.id)}
+                              >
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          ) : (
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem asChild>
+                                <Link href={`/deals/get/${deal.id}`}>View</Link>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem asChild>
+                                <Link href={`/deals/create/${deal.id}`}>
+                                  Edit
+                                </Link>
+                              </DropdownMenuItem>
 
-
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={() => handleDeleteDeal(deal.id)}
-                            >
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent> : (<DropdownMenuContent align="end">
-                            <DropdownMenuItem asChild>
-                              <Link href={`/deals/get/${deal.id}`}>View</Link>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem asChild>
-                              <Link href={`/deals/create/${deal.id}`}>
-                                Edit
-                              </Link>
-                            </DropdownMenuItem>
-
-
-                            <DropdownMenuItem
-                              onClick={() => {
-                                setActiveDeal(deal);
-                                setOpenFollowup(true);
-                              }}
-                            >
-                              Add Follow Up
-                            </DropdownMenuItem>
-                            <DropdownMenuItem
-                              className="text-destructive focus:text-destructive"
-                              onClick={() => handleDeleteDeal(deal.id)}
-                            >
-                              Delete
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>)
-                          }
+                              <DropdownMenuItem
+                                onClick={() => {
+                                  setActiveDeal(deal);
+                                  setOpenFollowup(true);
+                                }}
+                              >
+                                Add Follow Up
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={() => handleDeleteDeal(deal.id)}
+                              >
+                                Delete
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          )}
                         </DropdownMenu>
                       </div>
                     </TableCell>
@@ -1576,39 +1499,15 @@ export default function DealsPage() {
             </TableBody>
           </Table>
         </div>
-
-        {/* <div className="mt-4">
-          <Link href="/dashboard" className="underline">
-            Back to Home
-          </Link>
-        </div> */}
       </div>
 
-
-
-
-
-
-
-
       {openFilters && (
-        // <FiltersDrawer
-        //   open={openFilters}
-        //   onClose={() => setOpenFilters(false)}
-        //   stages={stages}
-        //   deals={deals}
-        //   priorities={priorities}
-        // />
-
-
-
         <FiltersDrawer
           open={openFilters}
           onClose={() => setOpenFilters(false)}
           stages={stages}
           deals={deals}
           priorities={priorities}
-
           dateFilterOn={dateFilterOn}
           setDateFilterOn={setDateFilterOn}
           dateFrom={dateFrom}
@@ -1632,10 +1531,7 @@ export default function DealsPage() {
           priorityFilter={priorityFilter}
           setPriorityFilter={setPriorityFilter}
         />
-
-
       )}
-
 
       <AddFollowupModal
         open={openFollowup}
@@ -1646,13 +1542,6 @@ export default function DealsPage() {
         }}
         onSaved={() => mutateDeals()}
       />
-
-
-
-
-
-
-
     </main>
   );
 }

@@ -137,6 +137,47 @@ const createDeal = (payload: DealPayload) => fetchJson<DealRecord>(`${BASE_URL}/
 const updateDeal = ({ id, payload }: { id: string | number; payload: DealPayload | Partial<DealPayload> }) => fetchJson<DealRecord>(`${BASE_URL}/deals/${id}`, { method: "PUT", headers: authHeaders(true), body: JSON.stringify(payload) })
 const deleteDeal = (id: string | number) => fetchJson<void>(`${BASE_URL}/deals/${id}`, { method: "DELETE", headers: authHeaders() })
 const updateDealStage = ({ id, stage }: { id: string | number; stage: string }) => fetchJson<DealRecord>(`${BASE_URL}/deals/${id}/stage?stage=${encodeURIComponent(stage)}`, { method: "PUT", headers: authHeaders() })
+const assignDealPriority = async ({
+  id,
+  priorityId,
+  hasExistingPriority,
+}: {
+  id: string | number
+  priorityId: number
+  hasExistingPriority?: boolean
+}) => {
+  if (!BASE_URL) throw new Error("NEXT_PUBLIC_MAIN is not configured")
+
+  const request = (method: "POST" | "PUT", suffix: "/priority/assign" | "/priority") =>
+    fetch(`${BASE_URL}/deals/${id}${suffix}`, {
+      method,
+      headers: authHeaders(true),
+      body: JSON.stringify({ priorityId }),
+    })
+
+  let response = hasExistingPriority
+    ? await request("PUT", "/priority")
+    : await request("POST", "/priority/assign")
+
+  if (response.status === 404) {
+    response = hasExistingPriority
+      ? await request("POST", "/priority/assign")
+      : await request("PUT", "/priority")
+  }
+
+  if (!response.ok) {
+    let message = "Priority update failed"
+    try {
+      const json = await response.json()
+      message = json?.message || json?.error || message
+    } catch {
+      message = (await response.text()) || message
+    }
+    throw new Error(message)
+  }
+
+  return response.json() as Promise<unknown>
+}
 
 export function useDealsQuery(options?: Partial<UseQueryOptions<DealRecord[], Error>>) {
   return useQuery({ queryKey: keys.deals(), queryFn: fetchDeals, ...options })
@@ -211,6 +252,21 @@ export function useUpdateDealStageMutation(options?: UseMutationOptions<DealReco
   const qc = useQueryClient()
   return useMutation({
     mutationFn: updateDealStage,
+    onSuccess: async (data, vars, ctx, meta) => {
+      await qc.invalidateQueries({ queryKey: keys.all })
+      await qc.invalidateQueries({ queryKey: keys.deal(vars.id) })
+      await options?.onSuccess?.(data, vars, ctx, meta)
+    },
+    ...options,
+  })
+}
+
+export function useAssignDealPriorityMutation(
+  options?: UseMutationOptions<unknown, Error, { id: string | number; priorityId: number; hasExistingPriority?: boolean }>
+) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: assignDealPriority,
     onSuccess: async (data, vars, ctx, meta) => {
       await qc.invalidateQueries({ queryKey: keys.all })
       await qc.invalidateQueries({ queryKey: keys.deal(vars.id) })
