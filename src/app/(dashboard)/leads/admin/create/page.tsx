@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 import { Card } from "@/components/ui/card";
-import { useAdminLeadsQuery, useCreateLeadMutation, useDealCategoriesQuery, useLeadEmployeesQuery, useLeadSourcesQuery } from "../api";
+import { useAdminLeadsQuery, useClientCategoriesQuery, useClientSubCategoriesQuery, useCreateLeadMutation, useDealCategoriesQuery, useLeadEmployeesQuery, useLeadSourcesQuery } from "../api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,6 +14,8 @@ import { format } from "date-fns";
 
 type Employee = { employeeId: string; name: string; designation?: string };
 type DealCategoryItem = { id: number; categoryName: string };
+type ClientCategoryItem = { id: number; categoryName: string };
+type ClientSubCategoryItem = { id: number; subCategoryName: string };
 type LeadSourceItem = { id: number; name: string };
 
 type DealPayload = {
@@ -33,6 +35,7 @@ type Lead = {
   email: string;
   mobileNumber?: string;
   clientCategory?: string;
+  clientSubCategory?: string;
   leadSource?: string;
   addedBy?: string;
   leadOwner?: string;
@@ -73,6 +76,7 @@ function EditModal({ lead, onClose, onSaved }: { lead: Lead; onClose: () => void
     name: lead?.name ?? "",
     email: lead?.email ?? "",
     clientCategory: lead?.clientCategory ?? "",
+    clientSubCategory: (lead as any)?.clientSubCategory ?? "",
     leadSource: lead?.leadSource ?? "",
     leadOwner: lead?.leadOwner ?? "",
     addedBy: lead?.addedBy ?? "",
@@ -106,6 +110,7 @@ function EditModal({ lead, onClose, onSaved }: { lead: Lead; onClose: () => void
       name: lead?.name ?? "",
       email: lead?.email ?? "",
       clientCategory: lead?.clientCategory ?? "",
+      clientSubCategory: (lead as any)?.clientSubCategory ?? "",
       leadSource: lead?.leadSource ?? "",
       leadOwner: lead?.leadOwner ?? "",
       addedBy: lead?.addedBy ?? "",
@@ -126,6 +131,7 @@ function EditModal({ lead, onClose, onSaved }: { lead: Lead; onClose: () => void
 
   const validate = () => {
     if (!form.name.trim() || !form.email.trim()) return "Name and Email are required.";
+    if (!form.clientCategory.trim() || !form.clientSubCategory.trim()) return "Client category and sub category are required.";
     return null;
   };
 
@@ -148,6 +154,7 @@ function EditModal({ lead, onClose, onSaved }: { lead: Lead; onClose: () => void
         name: form.name,
         email: form.email,
         clientCategory: form.clientCategory || undefined,
+        clientSubCategory: form.clientSubCategory || undefined,
         leadSource: form.leadSource || undefined,
         leadOwner: form.leadOwner || undefined,
         addedBy: form.addedBy || undefined,
@@ -657,12 +664,19 @@ export function AddLeadModal({
 
   const createLeadMutation = useCreateLeadMutation();
   const dealCategoriesQuery = useDealCategoriesQuery({ staleTime: 60 * 1000, refetchOnWindowFocus: false });
+  const clientCategoriesQuery = useClientCategoriesQuery({ staleTime: 60 * 1000, refetchOnWindowFocus: false });
+  const clientSubCategoriesQuery = useClientSubCategoriesQuery({ staleTime: 60 * 1000, refetchOnWindowFocus: false });
   const leadSourcesQuery = useLeadSourcesQuery({ staleTime: 60 * 1000, refetchOnWindowFocus: false });
 
   const dealCategories: DealCategoryItem[] = (dealCategoriesQuery.data ?? [])
     .map((item) => ({ id: item.id, categoryName: item.categoryName || item.name || "" }))
     .filter((item) => item.categoryName);
-  const clientCategories: DealCategoryItem[] = dealCategories;
+  const clientCategories: ClientCategoryItem[] = (clientCategoriesQuery.data ?? [])
+    .map((item) => ({ id: item.id, categoryName: item.categoryName || item.name || "" }))
+    .filter((item) => item.categoryName);
+  const clientSubCategories: ClientSubCategoryItem[] = (clientSubCategoriesQuery.data ?? [])
+    .map((item) => ({ id: item.id, subCategoryName: item.subCategoryName || item.name || "" }))
+    .filter((item) => item.subCategoryName);
   const leadSources: LeadSourceItem[] = (leadSourcesQuery.data ?? [])
     .map((item) => ({ id: item.id, name: item.name || "" }))
     .filter((item) => item.name);
@@ -683,6 +697,7 @@ export function AddLeadModal({
     email: "",
     mobileNumber: "",
     clientCategory: "",
+    clientSubCategory: "",
     leadSource: "",
     addedBy: "",
     leadOwner: "",
@@ -700,7 +715,7 @@ export function AddLeadModal({
   });
 
   // small add-list modal state
-  const [addModalOpen, setAddModalOpen] = useState<null | "clientCategory" | "leadSource" | "dealCategory">(null);
+  const [addModalOpen, setAddModalOpen] = useState<null | "clientCategory" | "clientSubCategory" | "leadSource" | "dealCategory">(null);
   const [addName, setAddName] = useState("");
   const [loadingAddList, setLoadingAddList] = useState(false);
   const [addListItems, setAddListItems] = useState<any[]>([]);
@@ -761,6 +776,9 @@ export function AddLeadModal({
     if (!payload.name?.trim() || !payload.email?.trim() || !payload.companyName?.trim()) {
       return "Name, Email and Company Name are required.";
     }
+    if (!payload.clientCategory?.trim() || !payload.clientSubCategory?.trim()) {
+      return "Client category and sub category are required.";
+    }
     if (payload.createDeal || payload.autoConvertToClient) {
       const d = payload.deal!;
       if (!d.title?.trim() || !d.value || !d.expectedCloseDate || !d.dealAgent) {
@@ -786,6 +804,7 @@ export function AddLeadModal({
         email: payload.email,
         mobileNumber: payload.mobileNumber || undefined,
         clientCategory: payload.clientCategory || undefined,
+        clientSubCategory: payload.clientSubCategory || undefined,
         leadSource: payload.leadSource || undefined,
         addedBy: payload.addedBy || undefined,
         leadOwner: payload.leadOwner || undefined,
@@ -822,7 +841,7 @@ export function AddLeadModal({
   };
 
   /* ----- small add-list helpers ----- */
-  const openAddModal = async (type: "clientCategory" | "leadSource" | "dealCategory") => {
+  const openAddModal = async (type: "clientCategory" | "clientSubCategory" | "leadSource" | "dealCategory") => {
     setAddModalOpen(type);
     setAddName("");
     setLoadingAddList(true);
@@ -830,16 +849,22 @@ export function AddLeadModal({
       if (type === "leadSource") {
         await leadSourcesQuery.refetch();
         setAddListItems(leadSources);
+      } else if (type === "clientCategory") {
+        await clientCategoriesQuery.refetch();
+        setAddListItems(clientCategories);
+      } else if (type === "clientSubCategory") {
+        await clientSubCategoriesQuery.refetch();
+        setAddListItems(clientSubCategories);
       } else {
         await dealCategoriesQuery.refetch();
-        setAddListItems(type === "clientCategory" ? clientCategories : dealCategories);
+        setAddListItems(dealCategories);
       }
     } finally {
       setLoadingAddList(false);
     }
   };
 
-  const addItem = async (type: "clientCategory" | "leadSource" | "dealCategory") => {
+  const addItem = async (type: "clientCategory" | "clientSubCategory" | "leadSource" | "dealCategory") => {
     if (!addName.trim()) return alert("Please enter a name.");
     setLoadingAddList(true);
     try {
@@ -848,12 +873,25 @@ export function AddLeadModal({
 
       let url = "";
       let body: any = {};
-      if (type === "leadSource") {
-        url = `${BASE}/deals/dealCategory/LeadSource`;
-        body = { name: addName.trim() };
-      } else {
-        url = `${BASE}/deals/dealCategory`;
-        body = { categoryName: addName.trim() };
+      switch (type) {
+        case "leadSource":
+          url = `${BASE}/deals/dealCategory/LeadSource`;
+          body = { name: addName.trim() };
+          break;
+        case "clientCategory":
+          url = `${BASE}/clients/category`;
+          body = { categoryName: addName.trim(), name: addName.trim() };
+          break;
+        case "clientSubCategory":
+          url = `${BASE}/clients/category/subcategory`;
+          body = { subCategoryName: addName.trim(), name: addName.trim() };
+          break;
+        case "dealCategory":
+          url = `${BASE}/deals/dealCategory`;
+          body = { categoryName: addName.trim() };
+          break;
+        default:
+          throw new Error("Unknown category type");
       }
 
       const res = await fetch(url, {
@@ -870,10 +908,18 @@ export function AddLeadModal({
       if (type === "leadSource") {
         await leadSourcesQuery.refetch();
         setPayload((p) => ({ ...p, leadSource: created.name || addName.trim() }));
+      } else if (type === "clientCategory") {
+        await clientCategoriesQuery.refetch();
+        const categoryValue = created.categoryName || created.name || addName.trim();
+        setPayload((p) => ({ ...p, clientCategory: categoryValue }));
+      } else if (type === "clientSubCategory") {
+        await clientSubCategoriesQuery.refetch();
+        const subCategoryValue = created.subCategoryName || created.name || addName.trim();
+        setPayload((p) => ({ ...p, clientSubCategory: subCategoryValue }));
       } else {
         await dealCategoriesQuery.refetch();
         const categoryValue = created.categoryName || created.name || addName.trim();
-        setPayload((p) => ({ ...p, deal: { ...(p.deal as DealPayload), dealCategory: categoryValue }, clientCategory: categoryValue }));
+        setPayload((p) => ({ ...p, deal: { ...(p.deal as DealPayload), dealCategory: categoryValue } }));
       }
 
       setAddName("");
@@ -886,7 +932,7 @@ export function AddLeadModal({
     }
   };
 
-  const deleteItem = async (type: "clientCategory" | "leadSource" | "dealCategory", id: number) => {
+  const deleteItem = async (type: "clientCategory" | "clientSubCategory" | "leadSource" | "dealCategory", id: number) => {
     if (!confirm("Are you sure you want to delete this item?")) return;
     try {
       const token = localStorage.getItem("accessToken");
@@ -895,6 +941,10 @@ export function AddLeadModal({
       let url = "";
       if (type === "leadSource") {
         url = `${BASE}/deals/dealCategory/LeadSource/${id}`;
+      } else if (type === "clientCategory") {
+        url = `${BASE}/clients/category/${id}`;
+      } else if (type === "clientSubCategory") {
+        url = `${BASE}/clients/category/subcategory/${id}`;
       } else {
         url = `${BASE}/deals/dealCategory/${id}`;
       }
@@ -907,6 +957,10 @@ export function AddLeadModal({
 
       if (type === "leadSource") {
         await leadSourcesQuery.refetch();
+      } else if (type === "clientCategory") {
+        await clientCategoriesQuery.refetch();
+      } else if (type === "clientSubCategory") {
+        await clientSubCategoriesQuery.refetch();
       } else {
         await dealCategoriesQuery.refetch();
       }
@@ -938,13 +992,24 @@ export function AddLeadModal({
           </div>
 
           <div>
-            <label className="block text-xs text-left text-muted-foreground mb-1">Client Category</label>
+            <label className="block text-xs text-left text-muted-foreground mb-1">Client Category *</label>
             <div className="flex gap-2">
               <select className="flex-1 border rounded-md px-3 py-2 text-sm" value={payload.clientCategory} onChange={(e) => update("clientCategory", e.target.value)}>
                 <option value="">--</option>
-                {clientCategories.map((c) => { const label = c.categoryName || (c as any).name || ""; return <option key={c.id} value={label}>{label}</option>; })}
+                {clientCategories.map((c) => <option key={c.id} value={c.categoryName}>{c.categoryName}</option>)}
               </select>
               <button type="button" onClick={() => openAddModal("clientCategory")} className="px-3 py-2 rounded border text-sm">Add</button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs text-left text-muted-foreground mb-1">Client Sub Category *</label>
+            <div className="flex gap-2">
+              <select className="flex-1 border rounded-md px-3 py-2 text-sm" value={payload.clientSubCategory} onChange={(e) => update("clientSubCategory", e.target.value)}>
+                <option value="">--</option>
+                {clientSubCategories.map((s) => <option key={s.id} value={s.subCategoryName}>{s.subCategoryName}</option>)}
+              </select>
+              <button type="button" onClick={() => openAddModal("clientSubCategory")} className="px-3 py-2 rounded border text-sm">Add</button>
             </div>
           </div>
 
@@ -1154,7 +1219,7 @@ export function AddLeadModal({
         <div className="max-w-2xl w-full bg-white rounded-lg shadow-lg border overflow-auto">
           <div className="flex items-center justify-between p-4 border-b">
             <h3 className="text-lg font-semibold">
-              {addModalOpen === "clientCategory" ? "Client Category" : addModalOpen === "leadSource" ? "Lead Source" : "Deal Category"}
+              {addModalOpen === "clientCategory" ? "Client Category" : addModalOpen === "clientSubCategory" ? "Client Sub Category" : addModalOpen === "leadSource" ? "Lead Source" : "Deal Category"}
             </h3>
             <button onClick={() => setAddModalOpen(null)} className="text-muted-foreground p-1 rounded hover:bg-slate-100">✕</button>
           </div>
@@ -1171,16 +1236,16 @@ export function AddLeadModal({
                     </tr>
                   </thead>
                   <tbody>
-                    {(addListItems.length ? addListItems : addModalOpen === "clientCategory" ? clientCategories : addModalOpen === "leadSource" ? leadSources : dealCategories).map((item: any, i: number) => (
+                    {(addListItems.length ? addListItems : addModalOpen === "clientCategory" ? clientCategories : addModalOpen === "clientSubCategory" ? clientSubCategories : addModalOpen === "leadSource" ? leadSources : dealCategories).map((item: any, i: number) => (
                       <tr key={i} className="border-t">
                         <td className="p-2">{i + 1}</td>
-                        <td className="p-2">{item.categoryName || item.name}</td>
+                        <td className="p-2">{item.subCategoryName || item.categoryName || item.name}</td>
                         <td className="p-2">
-                          <button onClick={() => deleteItem(addModalOpen === "leadSource" ? "leadSource" : addModalOpen === "clientCategory" ? "clientCategory" : "dealCategory", item.id)} className="text-destructive">🗑</button>
+                          <button onClick={() => deleteItem(addModalOpen === "leadSource" ? "leadSource" : addModalOpen === "clientCategory" ? "clientCategory" : addModalOpen === "clientSubCategory" ? "clientSubCategory" : "dealCategory", item.id)} className="text-destructive">🗑</button>
                         </td>
                       </tr>
                     ))}
-                    {(!addListItems.length && !(addModalOpen === "clientCategory" ? clientCategories.length : addModalOpen === "leadSource" ? leadSources.length : dealCategories.length)) && (
+                    {(!addListItems.length && !(addModalOpen === "clientCategory" ? clientCategories.length : addModalOpen === "clientSubCategory" ? clientSubCategories.length : addModalOpen === "leadSource" ? leadSources.length : dealCategories.length)) && (
                       <tr>
                         <td colSpan={3} className="p-4 text-sm text-muted-foreground">No items found.</td>
                       </tr>
@@ -1196,8 +1261,8 @@ export function AddLeadModal({
             </div>
 
             <div className="flex justify-end gap-2">
-              <button onClick={() => setAddModalOpen(null)} className="rounded-md px-4 py-2 border">Cancel</button>
-              <button onClick={() => addItem(addModalOpen)} disabled={loadingAddList} className="rounded-md bg-sky-600 text-white px-4 py-2">
+              <button type="button" onClick={() => setAddModalOpen(null)} className="rounded-md px-4 py-2 border">Cancel</button>
+              <button type="button" onClick={() => addModalOpen && addItem(addModalOpen)} disabled={loadingAddList} className="rounded-md bg-sky-600 text-white px-4 py-2">
                 {loadingAddList ? "Saving..." : "Save"}
               </button>
             </div>
@@ -1247,7 +1312,6 @@ export function AddLeadModal({
     </>
   );
 }
-
 
 
 

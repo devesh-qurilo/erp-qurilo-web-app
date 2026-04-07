@@ -1,6 +1,7 @@
 "use client"
 import React from "react"
 import { Button } from "@/components/ui/button"
+import { Badge } from "@/components/ui/badge"
 import { ArrowLeft, FileText, StickyNote } from "lucide-react"
 import Link from "next/link"
 
@@ -8,13 +9,15 @@ import Link from "next/link"
 type Props = {
     clientName: string
     clientId?: string
+    category?: string | null
+    subCategory?: string | null
     onBack?: () => void
     onOpenTab?: (tab: string) => void
     activeTab?: string
 }
 
 
-export const ClientHeader: React.FC<Props> = ({ clientName, clientId, onBack, onOpenTab, activeTab = "profile" }) => {
+export const ClientHeader: React.FC<Props> = ({ clientName, clientId, category, subCategory, onBack, onOpenTab, activeTab = "profile" }) => {
     const tabs = [
         { key: "profile", label: "Profile" },
         { key: "projects", label: "Projects" },
@@ -32,6 +35,10 @@ export const ClientHeader: React.FC<Props> = ({ clientName, clientId, onBack, on
                 <div>
                     <h1 className="text-3xl font-semibold">{clientName}</h1>
                     <p className="text-sm text-muted-foreground">Client ID: {clientId}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                        {category ? <Badge variant="secondary">Category: {category}</Badge> : null}
+                        {subCategory ? <Badge variant="outline">Sub Category: {subCategory}</Badge> : null}
+                    </div>
                 </div>
 
 

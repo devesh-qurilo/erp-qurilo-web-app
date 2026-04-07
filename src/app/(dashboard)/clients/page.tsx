@@ -99,6 +99,7 @@ export default function ClientsPage() {
 
   const [clientNameFilter, setClientNameFilter] = useState("All");
   const [headerCategoryFilter, setHeaderCategoryFilter] = useState("All");
+  const [headerSubCategoryFilter, setHeaderSubCategoryFilter] = useState("All");
 
   const placeholderImg = "/placeholder.png";
 
@@ -212,6 +213,10 @@ export default function ClientsPage() {
       result = result.filter((c) => c.category === headerCategoryFilter);
     }
 
+    if (headerSubCategoryFilter !== "All") {
+      result = result.filter((c) => c.subCategory === headerSubCategoryFilter);
+    }
+
     if (startDate || endDate) {
       result = result.filter((c) => {
         if (!c.createdAt) return false;
@@ -246,6 +251,7 @@ export default function ClientsPage() {
     categoryFilter,
     clientNameFilter,
     headerCategoryFilter,
+    headerSubCategoryFilter,
     startDate,      // 👈 ADD THIS
     endDate,        // 👈 ADD THIS
     clients,
@@ -585,6 +591,24 @@ if (loading) {
                   </select>
                 </div>
 
+                <div>
+                  <label className="block text-sm text-muted-foreground mb-1">
+                    Sub Category
+                  </label>
+                  <select
+                    value={headerSubCategoryFilter}
+                    onChange={(e) => setHeaderSubCategoryFilter(e.target.value)}
+                    className="w-full border rounded-md px-3 py-2"
+                  >
+                    <option value="All">All</option>
+                    {[...new Set(clients.map((c) => c.subCategory).filter(Boolean))].map(
+                      (subCat) => (
+                        <option key={subCat!} value={subCat!}>{subCat}</option>
+                      )
+                    )}
+                  </select>
+                </div>
+
                 {/* Clear */}
                 <div className="pt-6">
                   <Button
@@ -593,6 +617,7 @@ if (loading) {
                     onClick={() => {
                       setClientNameFilter("All");
                       setHeaderCategoryFilter("All");
+                      setHeaderSubCategoryFilter("All");
                       setDrawerOpen(false);
                     }}
                   >
@@ -619,6 +644,7 @@ if (loading) {
                 <TableHead>Email</TableHead>
                 <TableHead>Mobile</TableHead>
                 <TableHead>Category</TableHead>
+                <TableHead>Sub Category</TableHead>
                 <TableHead>Created</TableHead>
                 <TableHead>Action</TableHead>
               </TableRow>
@@ -656,6 +682,12 @@ if (loading) {
 
                   <TableCell>
                     {client.category ? <Badge>{client.category}</Badge> : "—"}
+                  </TableCell>
+
+                  <TableCell>
+                    {client.subCategory ? (
+                      <Badge variant="outline">{client.subCategory}</Badge>
+                    ) : "—"}
                   </TableCell>
 
                   <TableCell>

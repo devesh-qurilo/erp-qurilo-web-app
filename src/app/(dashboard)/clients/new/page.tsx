@@ -92,14 +92,16 @@ export default function AddClientDetails() {
     try {
       const res = await fetch(`${API_BASE}/clients/category`, { headers: getAuthHeader() })
       if (!res.ok) throw new Error("Failed to load categories")
-      setCategories(await res.json())
+      const data = await res.json()
+      setCategories((Array.isArray(data) ? data : []).map((item: any) => ({ id: item.id, categoryName: item.categoryName || item.name || "" })))
     } catch (e) { console.error(e) }
   }
   const fetchSubcategories = async () => {
     try {
       const res = await fetch(`${API_BASE}/clients/category/subcategory`, { headers: getAuthHeader() })
       if (!res.ok) throw new Error("Failed to load subcategories")
-      setSubcategories(await res.json())
+      const data = await res.json()
+      setSubcategories((Array.isArray(data) ? data : []).map((item: any) => ({ id: item.id, subCategoryName: item.subCategoryName || item.name || "" })))
     } catch (e) { console.error(e) }
   }
   useEffect(() => { fetchCategories(); fetchSubcategories() }, [])
@@ -223,7 +225,7 @@ export default function AddClientDetails() {
       if (!res.ok) throw new Error("Failed to save category")
       const created = await res.json()
       await fetchCategories()
-      setCategory(created?.categoryName ?? newCategoryName.trim())
+      setCategory(created?.categoryName ?? created?.name ?? newCategoryName.trim())
       setNewCategoryName(""); setShowCategoryModal(false)
     } catch (e) { console.error(e); alert("Could not save category") }
   }
@@ -239,7 +241,7 @@ export default function AddClientDetails() {
       if (!res.ok) throw new Error("Failed to save subcategory")
       const created = await res.json()
       await fetchSubcategories()
-      setSubCategory(created?.subCategoryName ?? newSubCategoryName.trim())
+      setSubCategory(created?.subCategoryName ?? created?.name ?? newSubCategoryName.trim())
       setNewSubCategoryName(""); setShowSubCategoryModal(false)
     } catch (e) { console.error(e); alert("Could not save subcategory") }
   }

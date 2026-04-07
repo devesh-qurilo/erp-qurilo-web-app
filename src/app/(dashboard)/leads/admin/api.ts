@@ -38,6 +38,7 @@ export interface LeadRecord {
     profileUrl?: string | null
   }
   clientCategory?: string
+  clientSubCategory?: string
   leadSource?: string
   autoConvertToClient?: boolean
   createDeal?: boolean
@@ -124,6 +125,7 @@ export interface LeadPayload {
   name: string
   email?: string
   clientCategory?: string
+  clientSubCategory?: string
   leadSource?: string
   addedBy?: string
   leadOwner?: string
@@ -147,6 +149,18 @@ export interface DealCategoryItem {
   name?: string
 }
 
+export interface ClientCategoryItem {
+  id: number
+  categoryName?: string
+  name?: string
+}
+
+export interface ClientSubCategoryItem {
+  id: number
+  subCategoryName?: string
+  name?: string
+}
+
 export interface LeadSourceItem {
   id: number
   name: string
@@ -165,6 +179,8 @@ const leadKeys = {
   dealComments: (dealId: string | number) => [...leadKeys.all, "deal-comments", String(dealId)] as const,
   employees: () => [...leadKeys.all, "employees"] as const,
   dealCategories: () => [...leadKeys.all, "deal-categories"] as const,
+  clientCategories: () => [...leadKeys.all, "client-categories"] as const,
+  clientSubCategories: () => [...leadKeys.all, "client-sub-categories"] as const,
   leadSources: () => [...leadKeys.all, "lead-sources"] as const,
 }
 
@@ -208,6 +224,8 @@ const fetchDealNotes = (dealId: string) => fetchJson<DealNoteRecord[]>(`${BASE_U
 const fetchDealTags = (dealId: string) => fetchJson<(DealTagRecord | string)[]>(`${BASE_URL}/deals/${dealId}/tags`, { headers: authHeaders(), cache: "no-store" })
 const fetchDealComments = (dealId: string) => fetchJson<DealCommentRecord[]>(`${BASE_URL}/deals/${dealId}/comments`, { headers: authHeaders(), cache: "no-store" })
 const fetchDealCategories = () => fetchJson<DealCategoryItem[]>(`${BASE_URL}/deals/dealCategory`, { headers: authHeaders(), cache: "no-store" })
+const fetchClientCategories = () => fetchJson<ClientCategoryItem[]>(`${BASE_URL}/clients/category`, { headers: authHeaders(), cache: "no-store" })
+const fetchClientSubCategories = () => fetchJson<ClientSubCategoryItem[]>(`${BASE_URL}/clients/category/subcategory`, { headers: authHeaders(), cache: "no-store" })
 const fetchLeadSources = () => fetchJson<LeadSourceItem[]>(`${BASE_URL}/deals/dealCategory/LeadSource`, { headers: authHeaders(), cache: "no-store" })
 
 const createLead = (payload: LeadPayload) => fetchJson<LeadRecord>(`${BASE_URL}/leads`, { method: "POST", headers: authHeaders(true), body: JSON.stringify(payload) })
@@ -257,6 +275,14 @@ export function useLeadEmployeesQuery(options?: Partial<UseQueryOptions<Employee
 
 export function useDealCategoriesQuery(options?: Partial<UseQueryOptions<DealCategoryItem[], Error>>) {
   return useQuery({ queryKey: leadKeys.dealCategories(), queryFn: fetchDealCategories, ...options })
+}
+
+export function useClientCategoriesQuery(options?: Partial<UseQueryOptions<ClientCategoryItem[], Error>>) {
+  return useQuery({ queryKey: leadKeys.clientCategories(), queryFn: fetchClientCategories, ...options })
+}
+
+export function useClientSubCategoriesQuery(options?: Partial<UseQueryOptions<ClientSubCategoryItem[], Error>>) {
+  return useQuery({ queryKey: leadKeys.clientSubCategories(), queryFn: fetchClientSubCategories, ...options })
 }
 
 export function useLeadSourcesQuery(options?: Partial<UseQueryOptions<LeadSourceItem[], Error>>) {

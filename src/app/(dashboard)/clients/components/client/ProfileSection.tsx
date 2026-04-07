@@ -104,6 +104,8 @@ export const ProfileSection: React.FC<{ client: any; projects?: any[]; companyDe
               <Row label="Address" value={companyDetails?.company?.address} />
               <Row label="State" value={companyDetails?.company?.state ?? "—"} />
               <Row label="Country" value={client?.country ?? "usa"} />
+              <Row label="Category" value={client.category ?? "—"} />
+              <Row label="Sub Category" value={client.subCategory ?? "—"} />
               <Row label="Postal Code" value={companyDetails?.company?.postalCode
 } />
               <Row label="Language" value={client.language} />

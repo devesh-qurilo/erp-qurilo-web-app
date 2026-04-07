@@ -1305,6 +1305,8 @@ export default function ClientDetailPage() {
         <ClientHeader
           clientName={client.name}
           clientId={client.clientId}
+          category={client.category}
+          subCategory={client.subCategory}
           onBack={() => router.push("/clients")}
           onOpenTab={(t) => setActiveTab(t)}
           activeTab={activeTab}

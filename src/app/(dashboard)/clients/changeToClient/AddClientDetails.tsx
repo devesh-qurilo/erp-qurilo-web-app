@@ -216,7 +216,13 @@ export default function AddClientDetails() {
         headers: getAuthHeader(),
       });
       if (!res.ok) throw new Error("Failed to load categories");
-      setCategories(await res.json());
+      const data = await res.json();
+      setCategories(
+        (Array.isArray(data) ? data : []).map((item: any) => ({
+          id: item.id,
+          categoryName: item.categoryName || item.name || "",
+        }))
+      );
     } catch (e) {
       console.error(e);
     }
@@ -227,7 +233,13 @@ export default function AddClientDetails() {
         headers: getAuthHeader(),
       });
       if (!res.ok) throw new Error("Failed to load subcategories");
-      setSubcategories(await res.json());
+      const data = await res.json();
+      setSubcategories(
+        (Array.isArray(data) ? data : []).map((item: any) => ({
+          id: item.id,
+          subCategoryName: item.subCategoryName || item.name || "",
+        }))
+      );
     } catch (e) {
       console.error(e);
     }
@@ -462,11 +474,6 @@ export default function AddClientDetails() {
   const saveSubCategory = async () => {
     if (!newSubCategoryName.trim()) return;
 
-    if (!categoryId) {
-      alert("Please select a category first");
-      return;
-    }
-
     try {
       const res = await fetch(`${API_BASE}/clients/category/subcategory`, {
         method: "POST",
@@ -476,7 +483,6 @@ export default function AddClientDetails() {
         },
         body: JSON.stringify({
           subCategoryName: newSubCategoryName.trim(),
-          categoryId: categoryId, // ✅ REQUIRED
         }),
       });
 
@@ -487,7 +493,7 @@ export default function AddClientDetails() {
       }
 
       await fetchSubcategories();
-      setSubCategory(data?.subCategoryName ?? newSubCategoryName.trim());
+      setSubCategory(data?.subCategoryName ?? data?.name ?? newSubCategoryName.trim());
       setNewSubCategoryName("");
       setShowSubCategoryModal(false);
     } catch (e: any) {
