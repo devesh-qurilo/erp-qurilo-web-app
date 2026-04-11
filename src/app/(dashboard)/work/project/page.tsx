@@ -8,6 +8,7 @@ import React, {
   useRef,
   useMemo,
 } from "react";
+import { useShallow } from "zustand/react/shallow";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -56,11 +57,26 @@ import ExportButton from "@/components/ExportButton";
 
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
+import {
+  createProjectCategory,
+  createProjectRecord,
+  deleteProjectCategory,
+  deleteProjectRecord,
+  fetchProjectById,
+  fetchProjectCategories,
+  fetchProjectClients,
+  fetchProjectDepartments,
+  fetchProjectEmployees,
+  fetchProjectsPage,
+  toggleProjectArchive,
+  toggleProjectPin,
+  updateProjectProgress,
+  updateProjectRecord,
+  updateProjectStatus,
+} from "./api";
+import { useProjectPageStore } from "./store";
 
 
-
-const MAIN = process.env.NEXT_PUBLIC_MAIN;
-const projectsFromApi = `${MAIN}/api/projects`;
 const STATUS_OPTIONS = [
   "IN_PROGRESS",
   "NOT_STARTED",
@@ -134,27 +150,94 @@ export default function AllProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [token, setToken] = useState<string | null>(null);
-
-  // Filters & UI
-  const [searchInput, setSearchInput] = useState("");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [progressFilter, setProgressFilter] = useState<string>("all");
-  const [durationFrom, setDurationFrom] = useState<string | null>(null);
-  const [durationTo, setDurationTo] = useState<string | null>(null);
-
-  // drawer filters
-  const [showFilters, setShowFilters] = useState(false);
-  const [filterProject, setFilterProject] = useState<string>("all");
-  const [filterMember, setFilterMember] = useState<string>("all");
-  const [filterClient, setFilterClient] = useState<string>("all");
-
-  const [currentPage, setCurrentPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const {
+    searchInput,
+    setSearchInput,
+    searchQuery,
+    setSearchQuery,
+    statusFilter,
+    setStatusFilter,
+    progressFilter,
+    setProgressFilter,
+    durationFrom,
+    setDurationFrom,
+    durationTo,
+    setDurationTo,
+    showFilters,
+    setShowFilters,
+    filterProject,
+    setFilterProject,
+    filterMember,
+    setFilterMember,
+    filterClient,
+    setFilterClient,
+    currentPage,
+    setCurrentPage,
+    totalPages,
+    setTotalPages,
+    showAddModal,
+    setShowAddModal,
+    showCategoryModal,
+    setShowCategoryModal,
+    showUpdateModal,
+    setShowUpdateModal,
+    updateProjectId,
+    setUpdateProjectId,
+    viewMode,
+    setViewMode,
+    showArchivedOnly,
+    setShowArchivedOnly,
+    showPinnedOnly,
+    setShowPinnedOnly,
+    calendarOpen,
+    setCalendarOpen,
+  } = useProjectPageStore(
+    useShallow((state) => ({
+      searchInput: state.searchInput,
+      setSearchInput: state.setSearchInput,
+      searchQuery: state.searchQuery,
+      setSearchQuery: state.setSearchQuery,
+      statusFilter: state.statusFilter,
+      setStatusFilter: state.setStatusFilter,
+      progressFilter: state.progressFilter,
+      setProgressFilter: state.setProgressFilter,
+      durationFrom: state.durationFrom,
+      setDurationFrom: state.setDurationFrom,
+      durationTo: state.durationTo,
+      setDurationTo: state.setDurationTo,
+      showFilters: state.showFilters,
+      setShowFilters: state.setShowFilters,
+      filterProject: state.filterProject,
+      setFilterProject: state.setFilterProject,
+      filterMember: state.filterMember,
+      setFilterMember: state.setFilterMember,
+      filterClient: state.filterClient,
+      setFilterClient: state.setFilterClient,
+      currentPage: state.currentPage,
+      setCurrentPage: state.setCurrentPage,
+      totalPages: state.totalPages,
+      setTotalPages: state.setTotalPages,
+      showAddModal: state.showAddModal,
+      setShowAddModal: state.setShowAddModal,
+      showCategoryModal: state.showCategoryModal,
+      setShowCategoryModal: state.setShowCategoryModal,
+      showUpdateModal: state.showUpdateModal,
+      setShowUpdateModal: state.setShowUpdateModal,
+      updateProjectId: state.updateProjectId,
+      setUpdateProjectId: state.setUpdateProjectId,
+      viewMode: state.viewMode,
+      setViewMode: state.setViewMode,
+      showArchivedOnly: state.showArchivedOnly,
+      setShowArchivedOnly: state.setShowArchivedOnly,
+      showPinnedOnly: state.showPinnedOnly,
+      setShowPinnedOnly: state.setShowPinnedOnly,
+      calendarOpen: state.calendarOpen,
+      setCalendarOpen: state.setCalendarOpen,
+    })),
+  );
   const itemsPerPage = 9;
 
   // Add project modal & form
-  const [showAddModal, setShowAddModal] = useState(false);
   const [shortCode, setShortCode] = useState("");
   const [projectName, setProjectName] = useState("");
   const [startDate, setStartDate] = useState("");
@@ -196,7 +279,6 @@ export default function AllProjectsPage() {
   const [submitting, setSubmitting] = useState(false);
 
   // Category modal
-  const [showCategoryModal, setShowCategoryModal] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [catLoading, setCatLoading] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
@@ -204,20 +286,12 @@ export default function AllProjectsPage() {
 
   // Clients & Departments
   const [clients, setClients] = useState<ClientItem[]>([]);
-  const [clientLoading, setClientLoading] = useState(false);
+  const [, setClientLoading] = useState(false);
   const [departments, setDepartments] = useState<DepartmentItem[]>([]);
-  const [deptLoading, setDeptLoading] = useState(false);
-
-  // Update modal
-  const [showUpdateModal, setShowUpdateModal] = useState(false);
-  const [updateProjectId, setUpdateProjectId] = useState<number | null>(null);
+  const [, setDeptLoading] = useState(false);
 
   // UI: view mode & quick filters
   type ViewMode = "grid" | "list" | "calendar";
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [showArchivedOnly, setShowArchivedOnly] = useState(false);
-  const [showPinnedOnly, setShowPinnedOnly] = useState(false);
-  const [calendarOpen, setCalendarOpen] = useState(false);
 
   // LOCK BODY SCROLL WHEN DRAWER OR MODAL OPEN
   useEffect(() => {
@@ -313,38 +387,29 @@ export default function AllProjectsPage() {
 
   //assign employee
 
-  const EMP_BASE = `${process.env.NEXT_PUBLIC_MAIN}`
   const loadEmployees = useCallback(async () => {
     setEmployeeLoading(true);
     try {
-      const token =
+      const accessToken =
         typeof window !== "undefined"
           ? localStorage.getItem("accessToken")
           : null;
 
-      const res = await fetch(`${EMP_BASE}/employee/all`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        cache: "no-store",
-      });
-
-      if (!res.ok) {
-        console.error("Failed to load employees", res.status);
+      if (!accessToken) {
         setEmployees([]);
         return;
       }
 
-      const data = await res.json();
-      if (Array.isArray(data)) {
-        setEmployees(
-          data.map((e: any) => ({
-            employeeId: e.employeeId,
-            name: e.name,
-            profilePictureUrl: e.profilePictureUrl ?? null,
-          }))
-        );
-      } else {
-        setEmployees([]);
-      }
+      const data = await fetchProjectEmployees<EmployeeItem>(accessToken);
+      setEmployees(
+        Array.isArray(data)
+          ? data.map((employee) => ({
+              employeeId: employee.employeeId,
+              name: employee.name,
+              profilePictureUrl: employee.profilePictureUrl ?? null,
+            }))
+          : [],
+      );
     } catch (err) {
       console.error("Employee load error", err);
       setEmployees([]);
@@ -377,77 +442,41 @@ const clientMap = useMemo(() => {
         if (!resolvedToken) {
           setProjects([]);
           setTotalPages(1);
-          setLoading(false);
           return;
         }
-
-        const params = new URLSearchParams({
-          page: String(currentPage),
-          limit: String(itemsPerPage),
-          search: searchQuery || "",
-          status: statusFilter !== "all" ? statusFilter : "",
-          progress: progressFilter !== "all" ? progressFilter : "",
-          project: filterProject !== "all" ? filterProject : "",
-          member: filterMember !== "all" ? filterMember : "",
-          client: filterClient !== "all" ? filterClient : "",
+        const data = await fetchProjectsPage<Project>(resolvedToken, {
+          page: currentPage,
+          limit: itemsPerPage,
+          search: searchQuery || undefined,
+          status: statusFilter !== "all" ? statusFilter : undefined,
+          progress: progressFilter !== "all" ? progressFilter : undefined,
+          project: filterProject !== "all" ? filterProject : undefined,
+          member: filterMember !== "all" ? filterMember : undefined,
+          client: filterClient !== "all" ? filterClient : undefined,
+          pinned: showPinnedOnly || undefined,
+          archived: showArchivedOnly || undefined,
         });
 
-        const res = await fetch(`${MAIN}/api/projects?${params.toString()}`, {
-          headers: { Authorization: `Bearer ${resolvedToken}` },
-          cache: "no-store",
+        let fetched = (Array.isArray(data.projects) ? data.projects : []).map((project) => {
+          const candidate = project as Project & { clientId?: string };
+          if (!candidate.client && candidate.clientId) {
+            const mapped = clientMap.get(String(candidate.clientId));
+
+            if (mapped) {
+              return {
+                ...candidate,
+                client: {
+                  clientId: mapped.clientId,
+                  name: mapped.name,
+                },
+              };
+            }
+          }
+
+          return candidate;
         });
 
-        if (res.status === 401) {
-          try {
-            localStorage.removeItem("accessToken");
-          } catch { }
-          setToken(null);
-          setProjects([]);
-          setTotalPages(1);
-          setLoading(false);
-          return;
-        }
-
-        if (!res.ok) {
-          const text = await res.text().catch(() => "");
-          console.error("getProjects failed", res.status, text);
-          throw new Error("Failed to load projects");
-        }
-
-        const data = await res.json();
-        let fetched: Project[] = [];
-        if (Array.isArray(data)) fetched = data;
-        else {
-          fetched = data.projects || data.items || [];
-          setTotalPages(
-            data.totalPages ||
-            Math.max(
-              1,
-              Math.ceil((data.total || itemsPerPage) / itemsPerPage)
-            )
-          );
-        }
-
-
-
-// ✅ 👉 PASTE HERE (IMPORTANT POSITION)
-fetched = fetched.map((p: any) => {
-  if (!p.client && p.clientId) {
-    const mapped = clientMap.get(String(p.clientId));
-
-    if (mapped) {
-      return {
-        ...p,
-        client: {
-          clientId: mapped.clientId,
-          name: mapped.name,
-        },
-      };
-    }
-  }
-
-  return p;
-});
+        setTotalPages(data.totalPages || 1);
 
 
         // apply local overrides
@@ -463,6 +492,12 @@ fetched = fetched.map((p: any) => {
         setProjects(fetched);
       } catch (err) {
         console.error("Error loading projects:", err);
+        if ((err as Error & { status?: number }).status === 401) {
+          try {
+            localStorage.removeItem("accessToken");
+          } catch {}
+          setToken(null);
+        }
         setProjects([]);
         setTotalPages(1);
       } finally {
@@ -478,7 +513,10 @@ fetched = fetched.map((p: any) => {
       filterMember,
       filterClient,
       token,
-        clientMap // ✅ ADD THIS
+      clientMap,
+      showPinnedOnly,
+      showArchivedOnly,
+      setTotalPages,
 
     ]
   );
@@ -494,27 +532,23 @@ fetched = fetched.map((p: any) => {
           (typeof window !== "undefined"
             ? localStorage.getItem("accessToken")
             : null);
-        const res = await fetch(`${MAIN}/api/projects/category`, {
-          headers: resolvedToken
-            ? { Authorization: `Bearer ${resolvedToken}` }
-            : undefined,
-          // cache: "no-store",
-        });
-        if (!res.ok) {
-          console.warn("Failed to load categories, status:", res.status);
+
+        if (!resolvedToken) {
           setCategories([]);
-          setCatLoading(false);
           return;
         }
-        const data = await res.json();
+
+        const data = await fetchProjectCategories<
+          string | { id?: string | number; name?: string | null; categoryName?: string | null }
+        >(resolvedToken);
         if (Array.isArray(data)) {
           if (data.length > 0 && typeof data[0] === "string") {
             setCategories(data.map((n, i) => ({ id: i + 1, name: String(n) })));
           } else {
             setCategories(
               data.map((d: any) => ({
-                id: d.id ?? d.name ?? Math.random(),
-                name: d.name ?? String(d),
+                id: d.id ?? d.name ?? d.categoryName ?? Math.random(),
+                name: d.name ?? d.categoryName ?? String(d),
               }))
             );
           }
@@ -554,41 +588,33 @@ fetched = fetched.map((p: any) => {
         (typeof window !== "undefined"
           ? localStorage.getItem("accessToken")
           : null);
-      const res = await fetch(`${MAIN}/api/projects/category`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(resolvedToken
-            ? { Authorization: `Bearer ${resolvedToken}` }
-            : {}),
-        },
-        body: JSON.stringify({ name }),
-        cache: "no-store",
-      });
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        console.error("Add category failed", res.status, text);
+
+      if (!resolvedToken) {
         setCategories(prev);
-        alert("Failed to add category");
+        alert("Not authenticated");
         return;
       }
-      const created = await res.json().catch(() => null);
-      if (created && (created.id || created.name)) {
+
+      const created = await createProjectCategory<{
+        id?: string | number;
+        name?: string | null;
+        categoryName?: string | null;
+      }>(resolvedToken, name);
+
+      if (created && (created.id || created.name || created.categoryName)) {
         setCategories((cur) =>
           cur.map((c) =>
             c.id === temp.id
               ? {
-                id: created.id ?? created.name ?? Math.random(),
-                name: created.name ?? name,
+                id: created.id ?? created.name ?? created.categoryName ?? Math.random(),
+                name: created.name ?? created.categoryName ?? name,
               }
               : c
           )
         );
-        setCategory(String(created.id ?? created.name ?? name));
+        setCategory(String(created.id ?? created.name ?? created.categoryName ?? name));
       } else {
         await loadCategories();
-        const found = categories.find((c) => c.name === name);
-        if (found) setCategory(String(found.id));
       }
       setNewCategoryName("");
     } catch (err) {
@@ -610,19 +636,12 @@ fetched = fetched.map((p: any) => {
         (typeof window !== "undefined"
           ? localStorage.getItem("accessToken")
           : null);
-      const res = await fetch(
-        `${MAIN}/api/projects/category/${encodeURIComponent(String(catId))}`,
-        {
-          method: "DELETE",
-          headers: resolvedToken
-            ? { Authorization: `Bearer ${resolvedToken}` }
-            : undefined,
-          cache: "no-store",
-        }
-      );
-      if (!res.ok) {
-        throw new Error("Delete failed");
+
+      if (!resolvedToken) {
+        throw new Error("Unauthorized");
       }
+
+      await deleteProjectCategory(resolvedToken, catId);
     } catch (err) {
       console.error("Delete category failed:", err);
       setCategories(prev);
@@ -641,25 +660,15 @@ fetched = fetched.map((p: any) => {
           (typeof window !== "undefined"
             ? localStorage.getItem("accessToken")
             : null);
-        // endpoint as provided: {{main}}/clients
-        const res = await fetch(`${MAIN}/clients`, {
-          headers: resolvedToken
-            ? { Authorization: `Bearer ${resolvedToken}` }
-            : undefined,
-          cache: "no-store",
-        });
-        if (!res.ok) {
-          console.warn("Failed to load clients, status:", res.status);
+
+        if (!resolvedToken) {
           setClients([]);
-          setClientLoading(false);
           return;
         }
-        const data = await res.json();
+
+        const data = await fetchProjectClients<ClientItem>(resolvedToken);
         if (Array.isArray(data)) {
-          // expecting array of client objects
           setClients(data as ClientItem[]);
-        } else if (Array.isArray(data.items)) {
-          setClients(data.items as ClientItem[]);
         } else {
           setClients([]);
         }
@@ -684,24 +693,15 @@ fetched = fetched.map((p: any) => {
           (typeof window !== "undefined"
             ? localStorage.getItem("accessToken")
             : null);
-        // endpoint as provided: {{main}}/admin/departments
-        const res = await fetch(`${MAIN}/admin/departments`, {
-          headers: resolvedToken
-            ? { Authorization: `Bearer ${resolvedToken}` }
-            : undefined,
-          cache: "no-store",
-        });
-        if (!res.ok) {
-          console.warn("Failed to load departments, status:", res.status);
+
+        if (!resolvedToken) {
           setDepartments([]);
-          setDeptLoading(false);
           return;
         }
-        const data = await res.json();
+
+        const data = await fetchProjectDepartments<DepartmentItem>(resolvedToken);
         if (Array.isArray(data)) {
           setDepartments(data as DepartmentItem[]);
-        } else if (Array.isArray(data.items)) {
-          setDepartments(data.items as DepartmentItem[]);
         } else {
           setDepartments([]);
         }
@@ -727,7 +727,7 @@ fetched = fetched.map((p: any) => {
       });
     }, 500);
     return () => clearTimeout(t);
-  }, [searchInput]);
+  }, [searchInput, setCurrentPage, setSearchQuery]);
 
   // initial token & load
   useEffect(() => {
@@ -785,32 +785,8 @@ fetched = fetched.map((p: any) => {
       )
     );
     try {
-      const fd = new FormData();
-      fd.append("status", newStatus);
-      const res = await fetch(`${MAIN}/api/projects/${projectId}/status`, {
-        method: "PUT",
-        body: fd,
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-        },
-      });
-      // if (!res.ok) throw new Error(`Status patch failed ${res.status}`);
-
-      let json: any = null;
-      try {
-        json = await res.json();
-      } catch {
-        json = null;
-      }
-
-      if (json && json.id) {
-        setProjects((ps) =>
-          ps.map((pr) => (pr.id === json.id ? { ...pr, ...json } : pr))
-        );
-        if (json.progressPercent != null) setProgressOverrideFor(json.id, null);
-      } else {
-        await getProjects(token);
-      }
+      await updateProjectStatus(token, projectId, newStatus);
+      await getProjects(token);
     } catch (err) {
       console.error("Status update failed", err);
       setProjects(prev);
@@ -830,51 +806,8 @@ fetched = fetched.map((p: any) => {
     setProgressOverrideFor(projectId, clamped);
 
     try {
-      const fd = new FormData();
-      fd.append("percent", String(clamped));
-      const res = await fetch(`${MAIN}/api/projects/${projectId}/progress`, {
-        method: "PUT",
-        body: fd,
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("accessToken")}`,
-        },
-      });
-
-      if (res.status === 401) {
-        console.error("patchProgress 401 unauthorized");
-        setProjects(prev);
-        setProgressOverrideFor(projectId, null);
-        localStorage.removeItem("accessToken");
-        setToken(null);
-        alert("Session expired. Please login again.");
-        return;
-      }
-
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        console.error("patchProgress failed:", res.status, text);
-        setProjects(prev);
-        setProgressOverrideFor(projectId, null);
-        alert("Failed to update progress on server");
-        return;
-      }
-
-      let json: any = null;
-      try {
-        if (res.status !== 204) json = await res.json();
-        else json = null;
-      } catch {
-        json = null;
-      }
-
-      if (json && json.id) {
-        setProjects((ps) =>
-          ps.map((pr) => (pr.id === json.id ? { ...pr, ...json } : pr))
-        );
-        if (json.progressPercent != null) setProgressOverrideFor(json.id, null);
-      } else {
-        await getProjects(token);
-      }
+      await updateProjectProgress(token, projectId, clamped);
+      await getProjects(token);
     } catch (err) {
       console.error("Progress update failed:", err);
       setProjects(prev);
@@ -893,26 +826,7 @@ fetched = fetched.map((p: any) => {
       ps.map((pr) => (pr.id === projectId ? { ...pr, pinned: newPinned } : pr))
     );
     try {
-      const res = await fetch(`${MAIN}/projects/${projectId}/pin`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ pinned: newPinned }),
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error("Pin failed");
-      try {
-        const json = await res.json();
-        if (json && json.id)
-          setProjects((ps) =>
-            ps.map((pr) => (pr.id === json.id ? { ...pr, ...json } : pr))
-          );
-        else await getProjects(token);
-      } catch {
-        await getProjects(token);
-      }
+      await toggleProjectPin(token, projectId, newPinned);
     } catch (err) {
       console.error(err);
       setProjects(prev);
@@ -932,28 +846,7 @@ fetched = fetched.map((p: any) => {
       )
     );
     try {
-      const res = await fetch(`${MAIN}/projects/${projectId}/archive`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ archived: newArchived }),
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error("Archive toggle failed");
-      try {
-        const json = await res.json();
-        if (json && json.id) {
-          setProjects((ps) =>
-            ps.map((pr) => (pr.id === json.id ? { ...pr, ...json } : pr))
-          );
-        } else {
-          await getProjects(token);
-        }
-      } catch {
-        await getProjects(token);
-      }
+      await toggleProjectArchive(token, projectId, newArchived);
     } catch (err) {
       console.error("Archive toggle error:", err);
       setProjects(prev);
@@ -963,15 +856,11 @@ fetched = fetched.map((p: any) => {
 
   const handleDelete = async (projectId: number) => {
     if (!confirm("Delete this project?")) return;
+    if (!token) return alert("Not authenticated");
     const prev = projects;
     setProjects((ps) => ps.filter((p) => p.id !== projectId));
     try {
-      const res = await fetch(`${MAIN}/api/projects/${projectId}`, {
-        method: "DELETE",
-        headers: { Authorization: token ? `Bearer ${token}` : "" },
-        cache: "no-store",
-      });
-      if (!res.ok) throw new Error("Delete failed");
+      await deleteProjectRecord(token, projectId);
       setProgressOverrideFor(projectId, null);
     } catch (err) {
       console.error(err);
@@ -1102,30 +991,12 @@ fetched = fetched.map((p: any) => {
           ? localStorage.getItem("accessToken")
           : null);
 
-      const res = await fetch(`${MAIN}/api/projects`, {
-        method: "POST",
-        body: fd,
-        headers: resolvedToken
-          ? { Authorization: `Bearer ${resolvedToken}` }
-          : undefined,
-      });
-
-      if (!res.ok) {
-        const text = await res.text().catch(() => "");
-        console.error("Create project failed", res.status, text);
-        let message = `Failed to create project (status ${res.status})`;
-        try {
-          const json = JSON.parse(text || "{}");
-          if (json && json.message) message = json.message;
-        } catch { }
-        alert(message);
-        setSubmitting(false);
+      if (!resolvedToken) {
+        alert("Not authenticated");
         return;
       }
 
-      try {
-        await res.json();
-      } catch { }
+      await createProjectRecord(resolvedToken, fd);
       await loadClients(resolvedToken); // ✅ important
 
       await getProjects(resolvedToken);
@@ -1214,19 +1085,15 @@ fetched = fetched.map((p: any) => {
             (typeof window !== "undefined"
               ? localStorage.getItem("accessToken")
               : null);
-          const res = await fetch(`${MAIN}/api/projects/${projectId}`, {
-            headers: resolvedToken
-              ? { Authorization: `Bearer ${resolvedToken}` }
-              : undefined,
-            cache: "no-store",
-          });
-          if (!res.ok) {
-            const text = await res.text().catch(() => "");
-            console.error("Failed to fetch project", res.status, text);
-            if (mounted) alert("Failed to load project details");
+          if (!resolvedToken) {
+            if (mounted) alert("Not authenticated");
             return;
           }
-          const data = await res.json();
+
+          const data = await fetchProjectById<Project & { hoursEstimate?: string | number | null }>(
+            resolvedToken,
+            projectId,
+          );
           if (!mounted) return;
           setUcShortCode(data.shortCode ?? data.code ?? data.projectCode ?? "");
           setUcProjectName(data.name ?? "");
@@ -1368,22 +1235,12 @@ fetched = fetched.map((p: any) => {
         const resolvedToken =
           token || localStorage.getItem("accessToken");
 
-        const res = await fetch(`${MAIN}/api/projects/${projectId}`, {
-          method: "PUT",
-          body: fd,
-          headers: resolvedToken
-            ? { Authorization: `Bearer ${resolvedToken}` }
-            : undefined,
-        });
-
-        if (!res.ok) {
-          const text = await res.text();
-          console.error(text);
-          alert("Failed to update project");
+        if (!resolvedToken) {
+          alert("Not authenticated");
           return;
         }
 
-        await res.json().catch(() => { });
+        await updateProjectRecord(resolvedToken, projectId, fd);
         onSaved();
         onClose();
         resetLocal();
@@ -1661,8 +1518,8 @@ fetched = fetched.map((p: any) => {
                           <SelectTrigger className="w-full">
                             <SelectValue
                               placeholder={
-                                Array.isArray(members) && members.length > 0
-                                  ? `${members.length} members selected`
+                                Array.isArray(ucMembers) && ucMembers.length > 0
+                                  ? `${ucMembers.length} members selected`
                                   : "Select members"
                               }
                             />
@@ -2035,7 +1892,6 @@ fetched = fetched.map((p: any) => {
     p.projectCode ||
     `RTA-${String(p.id).padStart(2, "0")}`;
 
-  const openFilters = () => setShowFilters(true);
   const closeFilters = () => setShowFilters(false);
   const applyFilters = async () => {
     setCurrentPage(1);
@@ -2639,7 +2495,7 @@ onChange={(e) => {
 
  
             <div className="flex items-center gap-3">
-              {/* <div className="flex items-center gap-2 border rounded px-2 py-1 bg-white">
+              <div className="flex items-center gap-2 border rounded px-2 py-1 bg-white">
                 <Search className="w-4 h-4 text-gray-400" />
                 <Input
                   placeholder="Search"
@@ -2653,7 +2509,7 @@ onChange={(e) => {
                   }}
                   className="border-0 bg-transparent focus-visible:ring-0"
                 />
-              </div> */}
+              </div>
 
               <div className="flex items-center bg-white border rounded-lg overflow-hidden">
                 {/* List */}
@@ -2879,7 +2735,7 @@ onChange={(e) => {
           </div>
 
           {/* PAGINATION */}
-          {/* <div className="flex items-center justify-between mt-4">
+          <div className="flex items-center justify-between mt-4">
             <div className="text-sm text-gray-600">
               Result per page -
               {filteredProjects.length ? filteredProjects.length : 0}
@@ -2909,7 +2765,7 @@ onChange={(e) => {
                 Next <ChevronRight />
               </Button>
             </div>
-          </div> */}
+          </div>
         </div>
       </main>
 
@@ -3636,17 +3492,4 @@ onChange={(e) => {
     </div>
   );
 
-  // Helper to group projects by start date string
-  function groupByStartDate(items: Project[]) {
-    const map: Record<string, Project[]> = {};
-    items.forEach((p) => {
-      const d = p.startDate
-        ? 
-        // new Date(p.startDate).toLocaleDateString()
-        format(  new Date(p.startDate), "dd-MM-yyyy" )
-        : "No start date";
-      (map[d] ||= []).push(p);
-    });
-    return map;
-  }
 }

@@ -16,8 +16,19 @@ export async function GET(request: Request) {
     const status = searchParams.get("status") || ""
     const progress = searchParams.get("progress") || ""
     const duration = searchParams.get("duration") || ""
+    const projectFilter = searchParams.get("project") || ""
+    const member = searchParams.get("member") || ""
+    const client = searchParams.get("client") || ""
+    const pinned = searchParams.get("pinned") === "true"
+    const archived = searchParams.get("archived") === "true"
 
-    const res = await fetch(`${process.env.NEXT_PUBLIC_MAIN}/api/projects/AllProject`, {
+    const upstreamPath = pinned
+      ? `${process.env.NEXT_PUBLIC_MAIN}/projects/pinned`
+      : archived
+        ? `${process.env.NEXT_PUBLIC_MAIN}/projects/archived`
+        : `${process.env.NEXT_PUBLIC_MAIN}/api/projects/AllProject`
+
+    const res = await fetch(upstreamPath, {
       method: "GET",
       cache: "no-store",
       headers: {
@@ -39,19 +50,45 @@ export async function GET(request: Request) {
         if (search) {
           const searchLower = search.toLowerCase()
           const matchesSearch =
-            project.name?.toLowerCase().includes(searchLower) || project.shortCode?.toLowerCase().includes(searchLower)
+            project.name?.toLowerCase().includes(searchLower) ||
+            project.shortCode?.toLowerCase().includes(searchLower) ||
+            project.client?.name?.toLowerCase().includes(searchLower)
           if (!matchesSearch) return false
         }
 
+        if (projectFilter) {
+          const matchesProject =
+            String(project.id) === String(projectFilter) ||
+            project.name?.toLowerCase() === projectFilter.toLowerCase()
+          if (!matchesProject) return false
+        }
+
+        if (member) {
+          const assignedEmployees = Array.isArray(project.assignedEmployees) ? project.assignedEmployees : []
+          const hasMember = assignedEmployees.some((employee: any) => String(employee.employeeId) === String(member))
+          if (!hasMember) return false
+        }
+
+        if (client) {
+          const matchesClient =
+            String(project.client?.clientId) === String(client) ||
+            String(project.client?.id) === String(client)
+          if (!matchesClient) return false
+        }
+
         // Status filter
-        if (status && project.status !== status) {
+        if (
+          status &&
+          project.status !== status &&
+          project.projectStatus !== status
+        ) {
           return false
         }
 
         // Progress filter
         if (progress) {
           const [min, max] = progress.split("-").map(Number)
-          const projectProgress = project.progress || 0
+          const projectProgress = project.progressPercent ?? project.progress ?? 0
           if (projectProgress < min || projectProgress > max) {
             return false
           }
@@ -78,7 +115,7 @@ export async function GET(request: Request) {
     }
 
     const totalItems = data.length
-    const totalPages = Math.ceil(totalItems / limit)
+    const totalPages = Math.max(1, Math.ceil(totalItems / limit))
     const startIndex = (page - 1) * limit
     const endIndex = startIndex + limit
     const paginatedData = data.slice(startIndex, endIndex)
