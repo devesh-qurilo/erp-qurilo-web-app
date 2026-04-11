@@ -1,12 +1,11 @@
-
 "use client";
 
 import React, { useEffect, useState } from "react";
 import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -14,452 +13,425 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import {
-    Select,
-    SelectTrigger,
-    SelectContent,
-    SelectItem,
-    SelectValue,
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
 
+import {
+  createProjectTask,
+  fetchProjectAssignableEmployees,
+  fetchProjectLabels,
+  fetchProjectList,
+  fetchProjectMilestones,
+  fetchTaskCategories,
+  fetchTaskStages,
+  getStoredAccessToken,
+  type ProjectEmployeeRecord,
+  type ProjectMilestoneRecord,
+  type ProjectRecord,
+  type TaskCategoryRecord,
+  type TaskDetailRecord,
+  type TaskLabelRecord,
+  type TaskStageRecord,
+} from "../api";
+
 interface DuplicateTaskModalProps {
-    open: boolean;
-    onOpenChange: (v: boolean) => void;
-    onCreated: () => void;
-    task: any;
+  open: boolean;
+  onOpenChange: (value: boolean) => void;
+  onCreated: () => void;
+  task: TaskDetailRecord;
 }
 
 export const DuplicateTaskModal: React.FC<DuplicateTaskModalProps> = ({
-    open,
-    onOpenChange,
-    onCreated,
-    task,
+  open,
+  onOpenChange,
+  onCreated,
+  task,
 }) => {
-    const MAIN = process.env.NEXT_PUBLIC_MAIN;
-    const token =
-        typeof window !== "undefined"
-            ? window.localStorage.getItem("accessToken")
-            : null;
+  const token = getStoredAccessToken();
 
-    /* ================= FORM STATES ================= */
-    const [title, setTitle] = useState("");
-    const [category, setCategory] = useState("");
-    const [projectId, setProjectId] = useState("");
-    const [startDate, setStartDate] = useState("");
-    const [dueDate, setDueDate] = useState("");
-    const [taskStageId, setTaskStageId] = useState("");
-    const [assignedEmployeeIds, setAssignedEmployeeIds] = useState<string[]>([]);
-    const [description, setDescription] = useState("");
-    const [labelIds, setLabelIds] = useState<string[]>([]);
-    const [priority, setPriority] = useState("");
-    const [isPrivate, setIsPrivate] = useState(false);
-    const [timeEstimate, setTimeEstimate] = useState(false);
-    const [timeEstimateMinutes, setTimeEstimateMinutes] = useState("");
-    const [isDependent, setIsDependent] = useState(false);
-    const [milestoneId, setMilestoneId] = useState("");
-    const [file, setFile] = useState<File | null>(null);
-    const [loading, setLoading] = useState(false);
+  const [title, setTitle] = useState("");
+  const [category, setCategory] = useState("");
+  const [projectId, setProjectId] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [dueDate, setDueDate] = useState("");
+  const [taskStageId, setTaskStageId] = useState("");
+  const [assignedEmployeeIds, setAssignedEmployeeIds] = useState<string[]>([]);
+  const [description, setDescription] = useState("");
+  const [labelIds, setLabelIds] = useState<string[]>([]);
+  const [priority, setPriority] = useState("");
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [timeEstimate, setTimeEstimate] = useState(false);
+  const [timeEstimateMinutes, setTimeEstimateMinutes] = useState("");
+  const [isDependent, setIsDependent] = useState(false);
+  const [milestoneId, setMilestoneId] = useState("");
+  const [file, setFile] = useState<File | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-    /* ================= API DATA ================= */
-    const [categories, setCategories] = useState<any[]>([]);
-    const [projects, setProjects] = useState<any[]>([]);
-    const [stages, setStages] = useState<any[]>([]);
-    const [employees, setEmployees] = useState<any[]>([]);
-    const [milestones, setMilestones] = useState<any[]>([]);
-    const [labels, setLabels] = useState<any[]>([]);
+  const [categories, setCategories] = useState<TaskCategoryRecord[]>([]);
+  const [projects, setProjects] = useState<ProjectRecord[]>([]);
+  const [stages, setStages] = useState<TaskStageRecord[]>([]);
+  const [projectEmployees, setProjectEmployees] = useState<ProjectEmployeeRecord[]>([]);
+  const [milestones, setMilestones] = useState<ProjectMilestoneRecord[]>([]);
+  const [labels, setLabels] = useState<TaskLabelRecord[]>([]);
 
-    /* ================= FETCHERS ================= */
-    const fetchCategories = async () => {
-        const res = await fetch(`${MAIN}/task/task-categories`, {
-            headers: { Authorization: `Bearer ${token}` },
-        });
-        setCategories(await res.json());
-    };
+  const toggle = (values: string[], nextValue: string) =>
+    values.includes(nextValue)
+      ? values.filter((value) => value !== nextValue)
+      : [...values, nextValue];
 
-    const fetchProjects = async () => {
-        const res = await fetch(`${MAIN}/api/projects`, {
-            headers: { Authorization: `Bearer ${token}` },
-        });
-        setProjects(await res.json());
-    };
+  useEffect(() => {
+    if (!open || !token) return;
 
-    const fetchStages = async () => {
-        const res = await fetch(`${MAIN}/status`, {
-            headers: { Authorization: `Bearer ${token}` },
-        });
-        setStages(await res.json());
-    };
+    void (async () => {
+      try {
+        setError(null);
+        const [nextCategories, nextProjects, nextStages] = await Promise.all([
+          fetchTaskCategories(token),
+          fetchProjectList(token),
+          fetchTaskStages(token),
+        ]);
 
-    const fetchEmployees = async () => {
-        const res = await fetch(`${MAIN}/employee/all`, {
-            headers: { Authorization: `Bearer ${token}` },
-        });
-        setEmployees(await res.json());
-    };
+        setCategories(nextCategories);
+        setProjects(nextProjects);
+        setStages(nextStages);
+      } catch (err) {
+        console.error(err);
+        setError(err instanceof Error ? err.message : "Failed to load duplicate task options");
+      }
+    })();
+  }, [open, token]);
 
-    const fetchMilestones = async (pid: string) => {
-        if (!pid) return;
-        const res = await fetch(`${MAIN}/api/projects/${pid}/milestones`, {
-            headers: { Authorization: `Bearer ${token}` },
-        });
-        setMilestones(await res.json());
-    };
+  useEffect(() => {
+    if (!open || !task) return;
 
-    const fetchLabels = async (pid: string) => {
-        if (!pid) return;
-        const res = await fetch(`${MAIN}/projects/${pid}/labels`, {
-            headers: { Authorization: `Bearer ${token}` },
-        });
-        setLabels(await res.json());
-    };
+    setTitle(task.title || "");
+    setCategory(String(task.categoryId?.id ?? ""));
+    setProjectId(String(task.projectId ?? ""));
+    setStartDate(task.startDate || "");
+    setDueDate(task.dueDate || "");
+    setTaskStageId(String(task.taskStageId ?? ""));
+    setDescription(task.description || "");
+    setPriority(task.priority || "");
+    setIsPrivate(Boolean(task.isPrivate));
+    setTimeEstimate(Boolean(task.timeEstimate));
+    setTimeEstimateMinutes(task.timeEstimateMinutes ? String(task.timeEstimateMinutes) : "");
+    setIsDependent(Boolean(task.isDependent));
+    setAssignedEmployeeIds(task.assignedEmployees?.map((employee) => employee.employeeId) || []);
+    setLabelIds(task.labels?.map((label) => String(label.id)) || []);
+    setMilestoneId(task.milestoneId ? String(task.milestoneId) : "");
+    setFile(null);
+    setError(null);
+  }, [open, task]);
 
-    /* ================= INITIAL LOAD ================= */
-    useEffect(() => {
-        if (!open) return;
-        fetchCategories();
-        fetchProjects();
-        fetchStages();
-        fetchEmployees();
-    }, [open]);
+  useEffect(() => {
+    if (!projectId || !token) {
+      setMilestones([]);
+      setLabels([]);
+      setProjectEmployees([]);
+      setAssignedEmployeeIds([]);
+      setMilestoneId("");
+      return;
+    }
 
-    /* ================= PREFILL ================= */
-    useEffect(() => {
-        if (!open || !task) return;
+    void (async () => {
+      try {
+        setError(null);
+        const [nextMilestones, nextLabels, nextEmployees] = await Promise.all([
+          fetchProjectMilestones(token, projectId),
+          fetchProjectLabels(token, projectId),
+          fetchProjectAssignableEmployees(token, projectId),
+        ]);
 
-        setTitle(task.title || "");
-        setCategory(String(task.categoryId || ""));
-        setProjectId(String(task.projectId || ""));
-        setStartDate(task.startDate || "");
-        setDueDate(task.dueDate || "");
-        setTaskStageId(String(task.taskStageId || ""));
-        setDescription(task.description || "");
-        setPriority(task.priority || "");
-        setIsPrivate(Boolean(task.isPrivate));
-        setTimeEstimate(Boolean(task.timeEstimate));
-        setTimeEstimateMinutes(
-            task.timeEstimateMinutes ? String(task.timeEstimateMinutes) : ""
+        setMilestones(nextMilestones);
+        setLabels(nextLabels);
+        setProjectEmployees(nextEmployees);
+        setAssignedEmployeeIds((previous) =>
+          previous.filter((employeeId) =>
+            nextEmployees.some((employee) => employee.employeeId === employeeId),
+          ),
         );
-        setIsDependent(Boolean(task.isDependent));
-
-        setAssignedEmployeeIds(
-            task.assignedEmployees?.map((e: any) => e.employeeId) || []
+        setLabelIds((previous) =>
+          previous.filter((labelId) =>
+            nextLabels.some((label) => String(label.id) === labelId),
+          ),
         );
-
-        setLabelIds(task.labels?.map((l: any) => String(l.id)) || []);
-
-        // reset milestone initially
-        setMilestoneId("");
-    }, [open, task]);
-
-    /* ================= DEPENDENCIES ================= */
-    useEffect(() => {
-        if (projectId) {
-            fetchMilestones(projectId);
-            fetchLabels(projectId);
-            setMilestoneId(""); // reset when project changes
-        }
-    }, [projectId]);
-
-    /* ===== Validate milestone after milestones load ===== */
-    useEffect(() => {
-        if (!milestones.length || !task?.milestoneId) return;
-
-        const exists = milestones.find(
-            (m) => String(m.id) === String(task.milestoneId)
+        setMilestoneId((previous) =>
+          nextMilestones.some((milestone) => String(milestone.id) === previous)
+            ? previous
+            : "",
         );
+      } catch (err) {
+        console.error(err);
+        setError(err instanceof Error ? err.message : "Failed to load project task options");
+      }
+    })();
+  }, [projectId, token]);
 
-        if (exists) {
-            setMilestoneId(String(task.milestoneId));
-        }
-    }, [milestones]);
+  const handleSave = async () => {
+    if (!token) {
+      setError("Not authenticated");
+      return;
+    }
 
-    const toggle = (arr: string[], v: string) =>
-        arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
+    try {
+      setLoading(true);
+      setError(null);
 
-    /* ================= SUBMIT ================= */
-    const handleSave = async () => {
-        try {
-            setLoading(true);
+      await createProjectTask(token, {
+        title,
+        category,
+        projectId,
+        startDate,
+        dueDate,
+        taskStageId,
+        description,
+        priority,
+        isPrivate,
+        timeEstimate,
+        timeEstimateMinutes,
+        isDependent,
+        milestoneId,
+        assignedEmployeeIds,
+        labelIds,
+        file,
+      });
 
-            const fd = new FormData();
-            fd.append("title", title);
-            fd.append("category", category);
-            fd.append("projectId", projectId);
-            fd.append("startDate", startDate);
-            fd.append("dueDate", dueDate);
-            fd.append("taskStageId", taskStageId);
-            fd.append("description", description);
-            fd.append("priority", priority);
-            fd.append("isPrivate", String(isPrivate));
-            fd.append("timeEstimate", String(timeEstimate));
-            fd.append("timeEstimateMinutes", timeEstimateMinutes);
-            fd.append("isDependent", String(isDependent));
+      onCreated();
+      onOpenChange(false);
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : "Failed to duplicate task");
+      alert("Failed to duplicate task");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-            if (milestoneId) {
-                fd.append("milestoneId", milestoneId);
-            }
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[95vh] w-[900px] overflow-y-auto rounded-xl">
+        <DialogHeader>
+          <DialogTitle>Duplicate Task</DialogTitle>
+        </DialogHeader>
 
-            fd.append("assignedEmployeeIds", JSON.stringify(assignedEmployeeIds));
+        <div className="grid gap-5">
+          <div>
+            <Label>Title *</Label>
+            <Input value={title} onChange={(event) => setTitle(event.target.value)} />
+          </div>
 
-            labelIds.forEach((id) => fd.append("labelIds", id));
+          <div>
+            <Label>Category *</Label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((item) => (
+                  <SelectItem value={String(item.id)} key={item.id}>
+                    {item.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-            if (file) fd.append("taskFile", file);
+          <div>
+            <Label>Project *</Label>
+            <Select value={projectId} onValueChange={setProjectId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select project" />
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map((project) => (
+                  <SelectItem value={String(project.id)} key={project.id}>
+                    {project.shortCode} - {project.name || project.projectName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-            const res = await fetch(`${MAIN}/api/projects/tasks`, {
-                method: "POST",
-                body: fd,
-                headers: { Authorization: `Bearer ${token}` },
-            });
+          <div>
+            <Label>Milestone *</Label>
+            <Select value={milestoneId} onValueChange={setMilestoneId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select milestone" />
+              </SelectTrigger>
+              <SelectContent>
+                {milestones.map((item) => (
+                  <SelectItem value={String(item.id)} key={item.id}>
+                    {item.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-            const data = await res.text();
-            console.log("STATUS:", res.status);
-            console.log("RESPONSE:", data);
+          <div>
+            <Label>Task Stage *</Label>
+            <Select value={taskStageId} onValueChange={setTaskStageId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select stage" />
+              </SelectTrigger>
+              <SelectContent>
+                {stages.map((item) => (
+                  <SelectItem value={String(item.id)} key={item.id}>
+                    {item.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-            if (!res.ok) throw new Error(data || "Failed");
+          {error ? (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+              {error}
+            </div>
+          ) : null}
 
-            onCreated();
-            onOpenChange(false);
-        } catch (e) {
-            console.error(e);
-            alert("Failed to duplicate task");
-        } finally {
-            setLoading(false);
-        }
-    };
+          <div>
+            <Label>Assign To *</Label>
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              {projectEmployees.length > 0 ? (
+                projectEmployees.map((employee) => (
+                  <div key={employee.employeeId} className="flex items-center gap-2">
+                    <Checkbox
+                      checked={assignedEmployeeIds.includes(employee.employeeId)}
+                      onCheckedChange={() =>
+                        setAssignedEmployeeIds(
+                          toggle(assignedEmployeeIds, employee.employeeId),
+                        )
+                      }
+                    />
+                    <span className="text-sm">{employee.name}</span>
+                  </div>
+                ))
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {projectId ? "No project members found" : "Select a project first"}
+                </p>
+              )}
+            </div>
+          </div>
 
-    /* ================= UI (Same as before) ================= */
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[95vh] w-[900px] overflow-y-auto rounded-xl">
-                <DialogHeader>
-                    <DialogTitle>Duplicate Task</DialogTitle>
-                </DialogHeader>
-
-                {/* SAME UI AS ADD TASK */}
-                {/* (UI intentionally kept identical) */}
-
-                <div className="grid gap-5">
-                    {/* Title */}
-                    <div>
-                        <Label>Title *</Label>
-                        <Input value={title} onChange={(e) => setTitle(e.target.value)} />
-                    </div>
-
-                    {/* Category */}
-                    <div>
-                        <Label>Category *</Label>
-                        <Select onValueChange={setCategory}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select category" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {categories.map((c) => (
-                                    <SelectItem value={String(c.id)} key={c.id}>
-                                        {c.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    {/* Project */}
-                    <div>
-                        <Label>Project *</Label>
-                        <Select onValueChange={setProjectId}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select project" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {projects.map((p) => (
-                                    <SelectItem value={String(p.id)} key={p.id}>
-                                        {p.shortCode} - {p.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    {/* Milestones */}
-                    <div>
-                        <Label>Milestone *</Label>
-                        <Select onValueChange={setMilestoneId}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select milestone" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {milestones.map((m) => (
-                                    <SelectItem value={String(m.id)} key={m.id}>
-                                        {m.title}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    {/* Stage */}
-                    <div>
-                        <Label>Task Stage *</Label>
-                        <Select onValueChange={setTaskStageId}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select stage" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {stages.map((s) => (
-                                    <SelectItem value={String(s.id)} key={s.id}>
-                                        {s.name}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    {/* Assigned Employees */}
-                    <div>
-                        <Label>Assign To *</Label>
-                        <div className="grid grid-cols-2 gap-2 pt-2">
-                            {employees.map((emp) => (
-                                <div key={emp.employeeId} className="flex items-center gap-2">
-                                    <Checkbox
-                                        checked={assignedEmployeeIds.includes(emp.employeeId)}
-                                        onCheckedChange={() =>
-                                            setAssignedEmployeeIds(
-                                                toggle(assignedEmployeeIds, emp.employeeId)
-                                            )
-                                        }
-                                    />
-                                    <span className="text-sm">{emp.name}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Labels */}
-                    <div>
-                        <Label>Labels *</Label>
-                        <div className="grid grid-cols-2 gap-2 pt-2">
-                            {labels.map((l) => (
-                                <div key={l.id} className="flex items-center gap-2">
-                                    <Checkbox
-                                        checked={labelIds.includes(String(l.id))}
-                                        onCheckedChange={() =>
-                                            setLabelIds(toggle(labelIds, String(l.id)))
-                                        }
-                                    />
-                                    <span>{l.name}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Dates */}
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <Label>Start Date *</Label>
-                            <Input
-                                type="date"
-                                value={startDate}
-                                onChange={(e) => setStartDate(e.target.value)}
-                            />
-                        </div>
-
-                        <div>
-                            <Label>Due Date *</Label>
-                            <Input
-                                type="date"
-                                value={dueDate}
-                                onChange={(e) => setDueDate(e.target.value)}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Description */}
-                    <div>
-                        <Label>Description *</Label>
-                        <Textarea
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                        />
-                    </div>
-
-                    {/* Priority */}
-                    <div>
-                        <Label>Priority *</Label>
-                        <Select onValueChange={setPriority}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select priority" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="LOW">Low</SelectItem>
-                                <SelectItem value="MEDIUM">Medium</SelectItem>
-                                <SelectItem value="HIGH">High</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    {/* Toggles */}
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="flex gap-2 items-center">
-                            <Checkbox
-                                checked={isPrivate}
-                                onCheckedChange={(v) => setIsPrivate(Boolean(v))}
-                            />
-                            <span>Private Task</span>
-                        </div>
-
-                        <div className="flex gap-2 items-center">
-                            <Checkbox
-                                checked={isDependent}
-                                onCheckedChange={(v) => setIsDependent(Boolean(v))}
-                            />
-                            <span>Dependent Task</span>
-                        </div>
-
-                        <div className="flex gap-2 items-center">
-                            <Checkbox
-                                checked={timeEstimate}
-                                onCheckedChange={(v) => setTimeEstimate(Boolean(v))}
-                            />
-                            <span>Time Estimate</span>
-                        </div>
-
-                        {timeEstimate && (
-                            <Input
-                                placeholder="Minutes"
-                                value={timeEstimateMinutes}
-                                onChange={(e) => setTimeEstimateMinutes(e.target.value)}
-                            />
-                        )}
-                    </div>
-
-                    {/* File Upload */}
-                    <div>
-                        <Label>Attachment *</Label>
-                        <Input
-                            type="file"
-                            onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-                        />
-                    </div>
+          <div>
+            <Label>Labels *</Label>
+            <div className="grid grid-cols-2 gap-2 pt-2">
+              {labels.map((label) => (
+                <div key={label.id} className="flex items-center gap-2">
+                  <Checkbox
+                    checked={labelIds.includes(String(label.id))}
+                    onCheckedChange={() =>
+                      setLabelIds(toggle(labelIds, String(label.id)))
+                    }
+                  />
+                  <span>{label.name}</span>
                 </div>
+              ))}
+            </div>
+          </div>
 
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <Label>Start Date *</Label>
+              <Input
+                type="date"
+                value={startDate}
+                onChange={(event) => setStartDate(event.target.value)}
+              />
+            </div>
 
+            <div>
+              <Label>Due Date *</Label>
+              <Input
+                type="date"
+                value={dueDate}
+                onChange={(event) => setDueDate(event.target.value)}
+              />
+            </div>
+          </div>
 
+          <div>
+            <Label>Description</Label>
+            <Textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+            />
+          </div>
 
+          <div>
+            <Label>Priority *</Label>
+            <Select value={priority} onValueChange={setPriority}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select priority" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="LOW">Low</SelectItem>
+                <SelectItem value="MEDIUM">Medium</SelectItem>
+                <SelectItem value="HIGH">High</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
-                {/* FOOTER */}
-                <div className="flex justify-end gap-3 pt-4">
-                    <Button variant="outline" onClick={() => onOpenChange(false)}>
-                        Cancel
-                    </Button>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex gap-2 items-center">
+              <Checkbox
+                checked={isPrivate}
+                onCheckedChange={(value) => setIsPrivate(Boolean(value))}
+              />
+              <span>Private Task</span>
+            </div>
 
-                    <Button onClick={handleSave} disabled={loading}>
-                        {loading ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                            "Save Task"
-                        )}
-                    </Button>
-                </div>
-            </DialogContent>
-        </Dialog>
-    );
+            <div className="flex gap-2 items-center">
+              <Checkbox
+                checked={isDependent}
+                onCheckedChange={(value) => setIsDependent(Boolean(value))}
+              />
+              <span>Dependent Task</span>
+            </div>
+
+            <div className="flex gap-2 items-center">
+              <Checkbox
+                checked={timeEstimate}
+                onCheckedChange={(value) => setTimeEstimate(Boolean(value))}
+              />
+              <span>Time Estimate</span>
+            </div>
+
+            {timeEstimate ? (
+              <Input
+                placeholder="Minutes"
+                value={timeEstimateMinutes}
+                onChange={(event) => setTimeEstimateMinutes(event.target.value)}
+              />
+            ) : null}
+          </div>
+
+          <div>
+            <Label>Attachment</Label>
+            <Input
+              type="file"
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-3">
+          <Button variant="outline" onClick={() => onOpenChange(false)} type="button">
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={loading} type="button">
+            {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : "Duplicate"}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
 };

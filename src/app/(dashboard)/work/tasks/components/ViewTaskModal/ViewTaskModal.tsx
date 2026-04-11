@@ -111,42 +111,64 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { X } from "lucide-react";
 import TaskDetailsSection from "./TaskDetailsSection";
 import FilesTab from "./Tabs/FilesTab";
 import SubTasksTab from "./Tabs/SubTasksTab";
 import TimesheetTab from "./Tabs/TimesheetTab";
 import NotesTab from "./Tabs/NotesTab";
+import { fetchTaskById, getStoredAccessToken, type TaskDetailRecord } from "../../api";
+import { useViewTaskModalStore } from "./store";
 
-const MAIN_API = process.env.NEXT_PUBLIC_MAIN;
+interface ViewTaskModalProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  taskId: number | null;
+}
 
-export default function ViewTaskModal({ open, onOpenChange, taskId }) {
-    const [task, setTask] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState("files");
+export default function ViewTaskModal({ open, onOpenChange, taskId }: ViewTaskModalProps) {
+    const [task, setTask] = useState<TaskDetailRecord | null>(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const activeTab = useViewTaskModalStore((state) => state.activeTab);
+    const setActiveTab = useViewTaskModalStore((state) => state.setActiveTab);
+    const reset = useViewTaskModalStore((state) => state.reset);
 
-    useEffect(() => {
-        if (open && taskId) fetchTask();
-    }, [open, taskId]);
+    const loadTask = useCallback(async () => {
+        if (!taskId) return;
 
-    async function fetchTask() {
+        const token = getStoredAccessToken();
+        if (!token) {
+            setTask(null);
+            setError("Not authenticated");
+            return;
+        }
+
         try {
             setLoading(true);
-            const token = localStorage.getItem("accessToken");
-
-            const res = await fetch(`${MAIN_API}/projects/tasks/${taskId}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-
-            const data = await res.json();
-            setTask(data);
+            setError(null);
+            setTask(await fetchTaskById(token, taskId));
         } catch (err) {
             console.error(err);
+            setTask(null);
+            setError(err instanceof Error ? err.message : "Failed to load task");
         } finally {
             setLoading(false);
         }
-    }
+    }, [taskId]);
+
+    useEffect(() => {
+        if (!open || !taskId) {
+            setTask(null);
+            setError(null);
+            reset();
+            return;
+        }
+
+        reset();
+        void loadTask();
+    }, [loadTask, open, reset, taskId]);
 
     return (
         <div
@@ -194,6 +216,18 @@ export default function ViewTaskModal({ open, onOpenChange, taskId }) {
                         <div className="flex items-center justify-center h-96">
                             Loading...
                         </div>
+                    ) : error ? (
+                        <div className="flex h-96 flex-col items-center justify-center gap-3 text-sm text-red-500">
+                            <p>{error}</p>
+                            <button
+                                className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-700 hover:bg-slate-50"
+                                onClick={() => {
+                                    void loadTask();
+                                }}
+                            >
+                                Retry
+                            </button>
+                        </div>
                     ) : (
                         <>
                             {/* TOP DETAILS SECTION */}
@@ -208,7 +242,7 @@ export default function ViewTaskModal({ open, onOpenChange, taskId }) {
                                             ? "border-b-2 border-blue-600 text-blue-600 font-medium"
                                             : "text-gray-500"
                                             }`}
-                                        onClick={() => setActiveTab(t)}
+                                        onClick={() => setActiveTab(t as "files" | "subtasks" | "timesheet" | "notes")}
                                     >
                                         {t === "files" && "Files"}
                                         {t === "subtasks" && "Sub Task"}
@@ -220,12 +254,12 @@ export default function ViewTaskModal({ open, onOpenChange, taskId }) {
 
                             {/* TAB CONTENT */}
                             <div className="p-6 min-h-[350px]">
-                                {activeTab === "files" && <FilesTab taskId={taskId} />}
-                                {activeTab === "subtasks" && <SubTasksTab taskId={taskId} />}
+                                {activeTab === "files" && taskId && <FilesTab taskId={taskId} />}
+                                {activeTab === "subtasks" && taskId && <SubTasksTab taskId={taskId} />}
                                 {activeTab === "timesheet" && (
-                                    <TimesheetTab taskId={taskId} />
+                                    taskId ? <TimesheetTab taskId={taskId} /> : null
                                 )}
-                                {activeTab === "notes" && <NotesTab taskId={taskId} />}
+                                {activeTab === "notes" && taskId && <NotesTab taskId={taskId} />}
                             </div>
                         </>
                     )}

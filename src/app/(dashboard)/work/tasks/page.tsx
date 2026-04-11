@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useDeferredValue, useEffect, useMemo, useState } from "react";
 import { Card } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
+import { useShallow } from "zustand/react/shallow";
 
 // TODO: ye components hum alag files me banayenge
 import { FiltersBar } from "./components/FiltersBar";
@@ -22,6 +22,16 @@ import { TaskFiltersDrawer } from "./components/TaskFiltersDrawer";
 
 import Skeleton from "react-loading-skeleton";
 import "react-loading-skeleton/dist/skeleton.css";
+import {
+  approveProjectTask,
+  deleteProjectTask,
+  fetchAllProjectTasks,
+  fetchMyProjectTasks,
+  getStoredAccessToken,
+  readPinnedTaskIds,
+  writePinnedTaskIds,
+} from "./api";
+import { useTasksPageStore } from "./store";
 
 
 /**
@@ -89,14 +99,6 @@ export interface Task {
 export type TaskViewMode = "list" | "kanban" | "calendar";
 export type TaskSource = "all" | "me" | "approval" | "pinned";
 
-interface DateRangeFilter {
-  start?: string | null; // ISO string (yyyy-mm-dd)
-  end?: string | null;
-}
-
-const MAIN_API = process.env.NEXT_PUBLIC_MAIN;
-const GATEWAY_API = process.env.NEXT_PUBLIC_GATEWAY ?? MAIN_API;
-
 /**
  * Main Tasks Page
  */
@@ -107,43 +109,82 @@ const TasksPage: React.FC = () => {
   const [loading, setLoading] = useState<boolean>(false);
   const [initialLoaded, setInitialLoaded] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-
-  // top filters (section 1)
-  const [statusFilter, setStatusFilter] = useState<TaskStageName | "All">(
-    "All"
+  const {
+    statusFilter,
+    setStatusFilter,
+    dateRange,
+    setDateRange,
+    openFilters,
+    setOpenFilters,
+    searchTerm,
+    setSearchTerm,
+    advancedFilters,
+    setAdvancedFilters,
+    resetAdvancedFilters,
+    taskSource,
+    setTaskSource,
+    viewMode,
+    setViewMode,
+    showAddTaskModal,
+    setShowAddTaskModal,
+    showCalendarModal,
+    setShowCalendarModal,
+    showStagesModal,
+    setShowStagesModal,
+    viewTaskId,
+    setViewTaskId,
+    showViewModal,
+    setShowViewModal,
+    duplicateOpen,
+    setDuplicateOpen,
+    duplicateTaskId,
+    setDuplicateTaskId,
+    editOpen,
+    setEditOpen,
+    editTaskId,
+    setEditTaskId,
+    pinnedTaskIds,
+    setPinnedTaskIds,
+  } = useTasksPageStore(
+    useShallow((state) => ({
+      statusFilter: state.statusFilter,
+      setStatusFilter: state.setStatusFilter,
+      dateRange: state.dateRange,
+      setDateRange: state.setDateRange,
+      openFilters: state.openFilters,
+      setOpenFilters: state.setOpenFilters,
+      searchTerm: state.searchTerm,
+      setSearchTerm: state.setSearchTerm,
+      advancedFilters: state.advancedFilters,
+      setAdvancedFilters: state.setAdvancedFilters,
+      resetAdvancedFilters: state.resetAdvancedFilters,
+      taskSource: state.taskSource,
+      setTaskSource: state.setTaskSource,
+      viewMode: state.viewMode,
+      setViewMode: state.setViewMode,
+      showAddTaskModal: state.showAddTaskModal,
+      setShowAddTaskModal: state.setShowAddTaskModal,
+      showCalendarModal: state.showCalendarModal,
+      setShowCalendarModal: state.setShowCalendarModal,
+      showStagesModal: state.showStagesModal,
+      setShowStagesModal: state.setShowStagesModal,
+      viewTaskId: state.viewTaskId,
+      setViewTaskId: state.setViewTaskId,
+      showViewModal: state.showViewModal,
+      setShowViewModal: state.setShowViewModal,
+      duplicateOpen: state.duplicateOpen,
+      setDuplicateOpen: state.setDuplicateOpen,
+      duplicateTaskId: state.duplicateTaskId,
+      setDuplicateTaskId: state.setDuplicateTaskId,
+      editOpen: state.editOpen,
+      setEditOpen: state.setEditOpen,
+      editTaskId: state.editTaskId,
+      setEditTaskId: state.setEditTaskId,
+      pinnedTaskIds: state.pinnedTaskIds,
+      setPinnedTaskIds: state.setPinnedTaskIds,
+    })),
   );
-  const [dateRange, setDateRange] = useState<DateRangeFilter>({});
-  const [openFilters, setOpenFilters] = useState(false);
-  const [searchTerm, setSearchTerm] = useState(""); // ✅ ADD
-
-
-  const [advancedFilters, setAdvancedFilters] = useState({
-    projectId: "All",
-    clientId: "All",
-    assignedTo: "All",
-    priority: "All",
-  });
-
-
-
-  // action bar state (section 2)
-  const [taskSource, setTaskSource] = useState<TaskSource>("all"); // All Tasks / My Tasks / Approval / Pin
-  const [viewMode, setViewMode] = useState<TaskViewMode>("list"); // List / Kanban / Calendar
-
-  // modals
-  const [showAddTaskModal, setShowAddTaskModal] = useState<boolean>(false);
-  const [showCalendarModal, setShowCalendarModal] = useState<boolean>(false);
-
-  const [showStagesModal, setShowStagesModal] = useState(false);
-
-  const [viewTaskId, setViewTaskId] = useState<number | null>(null);
-  const [showViewModal, setShowViewModal] = useState(false);
-
-  const [duplicateOpen, setDuplicateOpen] = useState(false);
-  const [duplicateTask, setDuplicateTask] = useState<Task | null>(null);
-
-  const [editOpen, setEditOpen] = useState(false);
-  const [editTaskId, setEditTaskId] = useState<number | null>(null);
+  const deferredSearchTerm = useDeferredValue(searchTerm);
 
   const handleViewTask = (task: Task) => {
     setViewTaskId(task.id);
@@ -151,111 +192,114 @@ const TasksPage: React.FC = () => {
   };
 
   const handleDuplicateTask = (task: Task) => {
-    setDuplicateTask(task);
+    setDuplicateTaskId(task.id);
     setDuplicateOpen(true);
   };
 
-  // --------- API Calls ---------
+  const hydratePinnedTasks = useCallback(() => {
+    setPinnedTaskIds(readPinnedTaskIds());
+  }, [setPinnedTaskIds]);
 
-  // Get All Tasks
-  const fetchAllTasks = async () => {
-    if (!MAIN_API) {
-      console.error("NEXT_PUBLIC_MAIN is not defined");
-      return;
-    }
+  const decoratePinnedTasks = useCallback(
+    (tasks: Task[]) =>
+      tasks.map((task) => ({
+        ...task,
+        pinned: pinnedTaskIds.includes(task.id),
+      })),
+    [pinnedTaskIds],
+  );
+
+  const loadTasks = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      const token =
-        typeof window !== "undefined"
-          ? window.localStorage.getItem("accessToken")
-          : null;
 
-      const res = await fetch(`${MAIN_API}/api/projects/tasks/getAll`, {
-        // TODO: yaha pe agar token chahiye ho to header add karna
-        headers: { Authorization: `Bearer ${token}` },
-        // credentials: "include",
-      });
-
-      if (!res.ok) {
-        throw new Error("Failed to fetch all tasks");
+      const token = getStoredAccessToken();
+      if (!token) {
+        setAllTasks([]);
+        setMyTasks([]);
+        setError("Not authenticated");
+        return;
       }
 
-      const data: Task[] = await res.json();
-      setAllTasks(data);
-    } catch (err: any) {
-      console.error(err);
-      setError(err.message || "Failed to fetch all tasks");
+      const [allResult, myResult] = await Promise.allSettled([
+        fetchAllProjectTasks<Task>(token),
+        fetchMyProjectTasks<Task>(token),
+      ]);
+
+      const allSucceeded = allResult.status === "fulfilled";
+      const mySucceeded = myResult.status === "fulfilled";
+
+      if (allSucceeded) {
+        setAllTasks(Array.isArray(allResult.value) ? allResult.value : []);
+      } else {
+        console.error(allResult.reason);
+        setAllTasks([]);
+      }
+
+      if (mySucceeded) {
+        setMyTasks(Array.isArray(myResult.value) ? myResult.value : []);
+      } else {
+        console.error(myResult.reason);
+        setMyTasks([]);
+      }
+
+      if (!allSucceeded && mySucceeded) {
+        setTaskSource("me");
+        setError(null);
+      } else if (!allSucceeded && !mySucceeded) {
+        setError(
+          (allResult.reason as Error)?.message ||
+            (myResult.reason as Error)?.message ||
+            "Failed to fetch tasks",
+        );
+      }
     } finally {
       setLoading(false);
       setInitialLoaded(true);
     }
-  };
+  }, [setTaskSource]);
 
-  // Get My Tasks
-  const fetchMyTasks = async () => {
-    if (!GATEWAY_API) {
-      console.error("NEXT_PUBLIC_GATEWAY (or MAIN) is not defined");
-      return;
-    }
-    try {
-      const token = localStorage.getItem("accessToken");
-      const res = await fetch(`${GATEWAY_API}/me/tasks`, {
-        // TODO: yaha pe agar token chahiye ho to header add karna
-        headers: { Authorization: `Bearer ${token}` },
-        // credentials: "include",
-      });
-
-      if (!res.ok) {
-        throw new Error("Failed to fetch my tasks");
-      }
-
-      const data: Task[] = await res.json();
-      setMyTasks(data);
-    } catch (err) {
-      console.error(err);
-      // my tasks fail ho to bhi page chal sakta hai, isliye yaha hard error nahi dikha raha
-    }
-  };
-
-  // initial load
   useEffect(() => {
-    fetchAllTasks();
-    fetchMyTasks();
-  }, []);
+    hydratePinnedTasks();
+    loadTasks();
+  }, [hydratePinnedTasks, loadTasks]);
+
+  const displayAllTasks = useMemo(() => decoratePinnedTasks(allTasks), [allTasks, decoratePinnedTasks]);
+  const displayMyTasks = useMemo(() => decoratePinnedTasks(myTasks), [myTasks, decoratePinnedTasks]);
 
 
   // ---------------- Filter Dropdown Options ----------------
 
   const projectOptions = useMemo(() => {
     const map = new Map<string, string>();
-    allTasks.forEach((t) => {
+    displayAllTasks.forEach((t) => {
       if (t.projectId && t.projectName) {
         map.set(String(t.projectId), t.projectName);
       }
     });
     return Array.from(map, ([id, name]) => ({ id, name }));
-  }, [allTasks]);
+  }, [displayAllTasks]);
 
   const clientOptions = useMemo(() => {
     const map = new Map<string, string>();
-    allTasks.forEach((t) => {
+    displayAllTasks.forEach((t) => {
       if (t.categoryId?.id && t.categoryId?.name) {
         map.set(String(t.categoryId.id), t.categoryId.name);
       }
     });
     return Array.from(map, ([id, name]) => ({ id, name }));
-  }, [allTasks]);
+  }, [displayAllTasks]);
 
   const employeeOptions = useMemo(() => {
     const map = new Map<string, string>();
-    allTasks.forEach((t) => {
+    displayAllTasks.forEach((t) => {
       t.assignedEmployees?.forEach((e) => {
         map.set(e.employeeId, e.name);
       });
     });
     return Array.from(map, ([id, name]) => ({ id, name }));
-  }, [allTasks]);
+  }, [displayAllTasks]);
 
   const priorityOptions = ["LOW", "MEDIUM", "HIGH"];
 
@@ -264,19 +308,19 @@ const TasksPage: React.FC = () => {
 
     switch (taskSource) {
       case "all":
-        base = allTasks;
+        base = displayAllTasks;
         break;
       case "me":
-        base = myTasks.length ? myTasks : allTasks;
+        base = displayMyTasks.length ? displayMyTasks : displayAllTasks;
         break;
       case "approval":
-        base = allTasks.filter((t) => t.taskStage?.name === "Waiting");
+        base = displayAllTasks.filter((t) => t.taskStage?.name === "Waiting");
         break;
       case "pinned":
-        base = allTasks.filter((t) => t.pinned);
+        base = displayAllTasks.filter((t) => t.pinned);
         break;
       default:
-        base = allTasks;
+        base = displayAllTasks;
     }
 
     // status filter
@@ -329,8 +373,8 @@ const TasksPage: React.FC = () => {
 
 
     // 🔍 SEARCH FILTER
-    if (searchTerm.trim()) {
-      const q = searchTerm.toLowerCase();
+    if (deferredSearchTerm.trim()) {
+      const q = deferredSearchTerm.toLowerCase();
 
       base = base.filter((t) => {
         return (
@@ -348,15 +392,20 @@ const TasksPage: React.FC = () => {
 
     return base;
   }, [
-    allTasks,
-    myTasks,
+    displayAllTasks,
+    displayMyTasks,
     taskSource,
     statusFilter,
     dateRange,
     advancedFilters, // ⚠️ IMPORTANT
-    searchTerm, // ✅ ADD THIS
+    deferredSearchTerm,
 
   ]);
+
+  const duplicateTask = useMemo(
+    () => sourceTasks.find((task) => task.id === duplicateTaskId) ?? displayAllTasks.find((task) => task.id === duplicateTaskId) ?? null,
+    [duplicateTaskId, displayAllTasks, sourceTasks],
+  );
 
 
 
@@ -365,9 +414,7 @@ const TasksPage: React.FC = () => {
   // --------- Handlers passed to child components ---------
 
   const handleAddTaskSuccess = () => {
-    // jab AddTaskModal se task successfully create ho jaye:
-    fetchAllTasks();
-    fetchMyTasks();
+    loadTasks();
   };
 
   const handleOpenCalendar = () => {
@@ -378,19 +425,17 @@ const TasksPage: React.FC = () => {
   const handleDeleteTask = async (taskId: number) => {
     if (!confirm("Are you sure you want to delete this task?")) return;
 
-    const token = localStorage.getItem("accessToken");
+    const token = getStoredAccessToken();
+    if (!token) {
+      alert("Not authenticated");
+      return;
+    }
 
-    const res = await fetch(`${MAIN_API}/api/projects/tasks/${taskId}/delete`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-
-    if (res.ok) {
-      fetchAllTasks();
-      fetchMyTasks();
-    } else {
+    try {
+      await deleteProjectTask(token, taskId);
+      await loadTasks();
+    } catch (err) {
+      console.error(err);
       alert("Failed to delete");
     }
   };
@@ -417,56 +462,33 @@ const TasksPage: React.FC = () => {
 
 
 const handlePinToggle = async (task: Task) => {
-  const token = localStorage.getItem("accessToken");
+  setPinnedTaskIds((previous) => {
+    const next = previous.includes(task.id)
+      ? previous.filter((id) => id !== task.id)
+      : [...previous, task.id];
 
-  const method = task.pinned ? "DELETE" : "POST";
-
-  const res = await fetch(`${MAIN_API}/projects/tasks/${task.id}/pin`, {
-    method,
-    headers: {
-      Authorization: `Bearer ${token}`,
-    },
+    writePinnedTaskIds(next);
+    return next;
   });
-
-  if (res.ok) {
-    fetchAllTasks();
-    fetchMyTasks();
-  } else {
-    alert("Unable to toggle pin");
-  }
 };
 
 
 
   const handleApproveTask = async (taskId: number) => {
-  const token = localStorage.getItem("accessToken");
-
-  try {
-
-
-
-    const res = await fetch(
-      // `${MAIN_API}/api/projects/tasks/${taskId}/approve`,
-     `${MAIN_API}/api/projects/tasks/${taskId}/status?statusId=3`,
-      {
-        method: "PATCH",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-
-    if (!res.ok) {
-      throw new Error("Failed to approve task");
+    const token = getStoredAccessToken();
+    if (!token) {
+      alert("Not authenticated");
+      return;
     }
 
-    fetchAllTasks();
-    fetchMyTasks();
-  } catch (err) {
-    console.error(err);
-    alert("Unable to approve task");
-  }
-};
+    try {
+      await approveProjectTask(token, taskId);
+      await loadTasks();
+    } catch (err) {
+      console.error(err);
+      alert("Unable to approve task");
+    }
+  };
 
   return (
     <main className="container mx-auto max-w-6xl px-4 py-8">
@@ -611,7 +633,7 @@ const handlePinToggle = async (task: Task) => {
                 <div className="flex h-64 flex-col items-center justify-center gap-2 text-sm text-red-500">
                   <p>{error}</p>
                   <button
-                    onClick={fetchAllTasks}
+                    onClick={loadTasks}
                     className="rounded-full border border-slate-200 px-3 py-1 text-xs text-slate-700 hover:bg-slate-50"
                   >
                     Retry
@@ -634,7 +656,8 @@ const handlePinToggle = async (task: Task) => {
                   onDuplicate={handleDuplicateTask}
                   // onTogglePin={(task) => handlePinToggle(task.id)}
                   onTogglePin={handlePinToggle}
-                    onApprove={(task) => handleApproveTask(task.id)}   // ✅ ADD THIS
+                  onApprove={(task) => handleApproveTask(task.id)}
+                  onTaskUpdated={loadTasks}
 
                 />
               ) : viewMode === "kanban" ? (
@@ -666,29 +689,36 @@ const handlePinToggle = async (task: Task) => {
 
         <ViewTaskModal
           open={showViewModal}
-          onOpenChange={setShowViewModal}
+          onOpenChange={(open) => {
+            setShowViewModal(open);
+            if (!open) setViewTaskId(null);
+          }}
           taskId={viewTaskId}
         />
         <EditTaskDrawer
           open={editOpen}
-          onOpenChange={setEditOpen}
+          onOpenChange={(open) => {
+            setEditOpen(open);
+            if (!open) setEditTaskId(null);
+          }}
           taskId={editTaskId}
           onUpdated={() => {
-            fetchAllTasks();
-            fetchMyTasks();
+            loadTasks();
           }}
         />
 
         {duplicateTask && (
           <DuplicateTaskModal
             open={duplicateOpen}
-            onOpenChange={setDuplicateOpen}
+            onOpenChange={(open) => {
+              setDuplicateOpen(open);
+              if (!open) setDuplicateTaskId(null);
+            }}
             task={duplicateTask}
             onCreated={() => {
               setDuplicateOpen(false);
-              setDuplicateTask(null);
-              fetchAllTasks();
-              fetchMyTasks();
+              setDuplicateTaskId(null);
+              loadTasks();
             }}
           />
         )}
@@ -698,14 +728,7 @@ const handlePinToggle = async (task: Task) => {
           onClose={() => setOpenFilters(false)}
           filters={advancedFilters}
           onChange={setAdvancedFilters}
-          onClear={() =>
-            setAdvancedFilters({
-              projectId: "All",
-              clientId: "All",
-              assignedTo: "All",
-              priority: "All",
-            })
-          }
+          onClear={resetAdvancedFilters}
           projects={projectOptions}
           clients={clientOptions}
           employees={employeeOptions}

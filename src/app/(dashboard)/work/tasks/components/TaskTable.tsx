@@ -24,6 +24,7 @@ interface TaskTableProps {
     onDuplicate?: (task: Task) => void;
     onTogglePin?: (task: Task) => void;
     onApprove?: (task: Task) => void;
+    onTaskUpdated?: () => void;
 }
 
 
@@ -34,7 +35,8 @@ export const TaskTable: React.FC<TaskTableProps> = ({
     onDelete,
     onDuplicate,
     onTogglePin,
-    onApprove
+    onApprove,
+    onTaskUpdated,
 }) => {
     return (
         <div className="w-full overflow-hidden rounded-xl bg-white">
@@ -150,10 +152,10 @@ export const TaskTable: React.FC<TaskTableProps> = ({
                                         ))}
                                     </div>
                                 </TableCell>
-
+                                
 
                                 <TableCell>
-                                    <StatusDropdown task={task} />
+                                    <StatusDropdown task={task} onUpdated={onTaskUpdated} />
                                 </TableCell>
 
                                 {/* Actions (...) */}

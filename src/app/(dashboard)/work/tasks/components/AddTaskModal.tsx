@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 import {
   Sheet,
@@ -8,8 +8,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-
-
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -23,23 +21,38 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
+
 import { AddLabelModal } from "./AddLabelModal";
+import {
+  createProjectTask,
+  fetchProjectAssignableEmployees,
+  fetchProjectLabels,
+  fetchProjectList,
+  fetchProjectMilestones,
+  fetchTaskCategories,
+  fetchTaskStages,
+  getStoredAccessToken,
+  type ProjectEmployeeRecord,
+  type ProjectMilestoneRecord,
+  type ProjectRecord,
+  type TaskCategoryRecord,
+  type TaskLabelRecord,
+  type TaskStageRecord,
+} from "../api";
 
 interface AddTaskModalProps {
   open: boolean;
-  onOpenChange: (v: boolean) => void;
+  onOpenChange: (value: boolean) => void;
   onCreated: () => void;
 }
+
+const emptyError = null;
 
 export const AddTaskModal: React.FC<AddTaskModalProps> = ({
   open,
   onOpenChange,
   onCreated,
 }) => {
-  // const GATEWAY = process.env.NEXT_PUBLIC_GATEWAY;
-  const MAIN = process.env.NEXT_PUBLIC_MAIN;
-
-  // ---------------- FORM STATES ----------------
   const [title, setTitle] = useState("");
   const [category, setCategory] = useState("");
   const [projectId, setProjectId] = useState("");
@@ -58,330 +71,276 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
   const [file, setFile] = useState<File | null>(null);
 
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(emptyError);
 
-  // ---------------- API DATA STATES ----------------
-  const [categories, setCategories] = useState<any[]>([]);
-  const [projects, setProjects] = useState<any[]>([]);
-  const [stages, setStages] = useState<any[]>([]);
-  const [employees, setEmployees] = useState<any[]>([]);
-  const [milestones, setMilestones] = useState<any[]>([]);
-  const [labels, setLabels] = useState<any[]>([]);
+  const [categories, setCategories] = useState<TaskCategoryRecord[]>([]);
+  const [projects, setProjects] = useState<ProjectRecord[]>([]);
+  const [stages, setStages] = useState<TaskStageRecord[]>([]);
+  const [projectEmployees, setProjectEmployees] = useState<ProjectEmployeeRecord[]>([]);
+  const [milestones, setMilestones] = useState<ProjectMilestoneRecord[]>([]);
+  const [labels, setLabels] = useState<TaskLabelRecord[]>([]);
 
   const [labelModalOpen, setLabelModalOpen] = useState(false);
 
-  const [projectTasks, setProjectTasks] = useState<any[]>([]);
+  const token = getStoredAccessToken();
 
-
-  // ---------------- API FETCH ----------------
-  const token =
-    typeof window !== "undefined"
-      ? window.localStorage.getItem("accessToken")
-      : null;
-  // Task Categories
-  const fetchCategories = async () => {
-    const token = localStorage.getItem("accessToken");
-    const res = await fetch(`${MAIN}/task/task-categories`, {
-      // TODO: yaha pe agar token chahiye ho to header add karna
-      headers: { Authorization: `Bearer ${token}` },
-      // credentials: "include",
-    });
-    const data = await res.json();
-    setCategories(data);
+  const resetForm = () => {
+    setTitle("");
+    setCategory("");
+    setProjectId("");
+    setStartDate("");
+    setDueDate("");
+    setTaskStageId("");
+    setAssignedEmployeeIds([]);
+    setDescription("");
+    setLabelIds([]);
+    setPriority("");
+    setIsPrivate(false);
+    setTimeEstimate(false);
+    setTimeEstimateMinutes("");
+    setIsDependent(false);
+    setMilestoneId("");
+    setFile(null);
+    setError(emptyError);
+    setProjectEmployees([]);
+    setMilestones([]);
+    setLabels([]);
   };
 
-  // Projects
-  const fetchProjects = async () => {
-    const res = await fetch(`${MAIN}/api/projects`, {
-      // TODO: yaha pe agar token chahiye ho to header add karna
-      headers: { Authorization: `Bearer ${token}` },
-      // credentials: "include",
-    });
-    const data = await res.json();
-    setProjects(data);
-  };
-
-  // Stages
-  const fetchStages = async () => {
-    const res = await fetch(`${MAIN}/status`, {
-      // TODO: yaha pe agar token chahiye ho to header add karna
-      headers: { Authorization: `Bearer ${token}` },
-      // credentials: "include",
-    });
-    const data = await res.json();
-    setStages(data);
-  };
-
-  // Employees
-  const fetchEmployees = async () => {
-    const res = await fetch(`${MAIN}/employee/all`, {
-      // TODO: yaha pe agar token chahiye ho to header add karna
-      headers: { Authorization: `Bearer ${token}` },
-      // credentials: "include",
-    });
-    const data = await res.json();
-    setEmployees(data);
-  };
-
-  // Milestones (depends on project)
-  const fetchMilestones = async (pid: string) => {
-    if (!pid) return;
-    const res = await fetch(`${MAIN}/api/projects/${pid}/milestones`, {
-      // TODO: yaha pe agar token chahiye ho to header add karna
-      headers: { Authorization: `Bearer ${token}` },
-      // credentials: "include",
-    });
-    const data = await res.json();
-    setMilestones(data);
-  };
-
-  // Labels (depends on project)
-  const fetchLabels = async (pid: string) => {
-    if (!pid) return;
-    const res = await fetch(`${MAIN}/projects/${pid}/labels`, {
-      // TODO: yaha pe agar token chahiye ho to header add karna
-      headers: { Authorization: `Bearer ${token}` },
-      // credentials: "include",
-    });
-    const data = await res.json();
-    setLabels(data);
-  };
-
-
-
-  const fetchProjectTasks = async (pid: string) => {
-    const res = await fetch(`${MAIN}/projects/${pid}/tasks`, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-
-    const data = await res.json();
-    setProjectTasks(data);
-  };
-
-
-
-  // Initial load
   useEffect(() => {
-    if (open) {
-      fetchCategories();
-      fetchProjects();
-      fetchStages();
-      fetchEmployees();
-    }
+    if (!open || !token) return;
+
+    void (async () => {
+      try {
+        setError(emptyError);
+        const [nextCategories, nextProjects, nextStages] = await Promise.all([
+          fetchTaskCategories(token),
+          fetchProjectList(token),
+          fetchTaskStages(token),
+        ]);
+
+        setCategories(nextCategories);
+        setProjects(nextProjects);
+        setStages(nextStages);
+      } catch (err) {
+        console.error(err);
+        setError(err instanceof Error ? err.message : "Failed to load task options");
+      }
+    })();
+  }, [open, token]);
+
+  useEffect(() => {
+    if (open) return;
+    resetForm();
   }, [open]);
 
-  // Project change → milestones + labels reload
   useEffect(() => {
-    if (projectId) {
-      fetchMilestones(projectId);
-      fetchLabels(projectId);
-      fetchProjectTasks(projectId); // 👈 add this
-
-
+    if (!projectId || !token) {
+      setProjectEmployees([]);
+      setMilestones([]);
+      setLabels([]);
+      setAssignedEmployeeIds([]);
+      setMilestoneId("");
+      setLabelIds([]);
+      return;
     }
-  }, [projectId]);
 
+    void (async () => {
+      try {
+        setError(emptyError);
+        const [nextMilestones, nextLabels, nextEmployees] = await Promise.all([
+          fetchProjectMilestones(token, projectId),
+          fetchProjectLabels(token, projectId),
+          fetchProjectAssignableEmployees(token, projectId),
+        ]);
 
+        setMilestones(nextMilestones);
+        setLabels(nextLabels);
+        setProjectEmployees(nextEmployees);
+        setAssignedEmployeeIds((previous) =>
+          previous.filter((employeeId) =>
+            nextEmployees.some((employee) => employee.employeeId === employeeId),
+          ),
+        );
+        setLabelIds((previous) =>
+          previous.filter((labelId) =>
+            nextLabels.some((label) => String(label.id) === labelId),
+          ),
+        );
+        setMilestoneId((previous) =>
+          nextMilestones.some((milestone) => String(milestone.id) === previous)
+            ? previous
+            : "",
+        );
+      } catch (err) {
+        console.error(err);
+        setError(err instanceof Error ? err.message : "Failed to load project task options");
+      }
+    })();
+  }, [projectId, token]);
 
-  const projectAssignedEmployees = React.useMemo(() => {
-    if (!projectTasks.length) return [];
+  const projectAssignedEmployees = useMemo(() => projectEmployees, [projectEmployees]);
 
-    const uniqueMap = new Map();
+  const toggle = (values: string[], nextValue: string) =>
+    values.includes(nextValue)
+      ? values.filter((value) => value !== nextValue)
+      : [...values, nextValue];
 
-    projectTasks.forEach((task) => {
-      task.assignedEmployees?.forEach((emp: any) => {
-        if (!uniqueMap.has(emp.employeeId)) {
-          uniqueMap.set(emp.employeeId, emp);
-        }
-      });
-    });
-
-    return Array.from(uniqueMap.values());
-  }, [projectTasks]);
-
-
-  // Multi-select toggle
-  const toggle = (arr: string[], v: string) =>
-    arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
-
-  // ---------------- SUBMIT ----------------
   const handleSave = async () => {
+    if (!token) {
+      setError("Not authenticated");
+      return;
+    }
+
     try {
       setLoading(true);
+      setError(emptyError);
 
-      const fd = new FormData();
-      fd.append("title", title);
-      fd.append("category", category); // ID
-      fd.append("projectId", projectId); // ID
-      fd.append("startDate", startDate);
-      fd.append("dueDate", dueDate);
-      fd.append("taskStageId", taskStageId); // ID
-      fd.append("description", description);
-      fd.append("priority", priority);
-      fd.append("isPrivate", String(isPrivate));
-      fd.append("timeEstimate", String(timeEstimate));
-      fd.append("timeEstimateMinutes", timeEstimateMinutes);
-      fd.append("isDependent", String(isDependent));
-      fd.append("milestoneId", milestoneId); // REQUIRED
-
-      // Arrays
-      assignedEmployeeIds.forEach((id) => fd.append("assignedEmployeeIds", id));
-
-      labelIds.forEach((id) => fd.append("labelIds", id));
-
-      if (file) fd.append("taskFile", file);
-
-      const res = await fetch(`${MAIN}/api/projects/tasks`, {
-        method: "POST",
-        body: fd,
-        // TODO: yaha pe agar token chahiye ho to header add karna
-        headers: { Authorization: `Bearer ${token}` },
-        // credentials: "include",
+      await createProjectTask(token, {
+        title,
+        category,
+        projectId,
+        startDate,
+        dueDate,
+        taskStageId,
+        description,
+        priority,
+        isPrivate,
+        timeEstimate,
+        timeEstimateMinutes,
+        isDependent,
+        milestoneId,
+        assignedEmployeeIds,
+        labelIds,
+        file,
       });
 
-      if (!res.ok) throw new Error("Failed");
-
+      resetForm();
       onCreated();
       onOpenChange(false);
-    } catch (e) {
-      //  console.log(e);
+    } catch (err) {
+      console.error(err);
+      setError(err instanceof Error ? err.message : "Failed to create task");
       alert("Failed to create task");
     } finally {
       setLoading(false);
     }
   };
 
-  // ---------------- UI ----------------
   return (
-  
-<Sheet open={open} onOpenChange={onOpenChange}>
-  <SheetContent
-    side="right"
-    className="
-     w-[83%]
-    sm:max-w-[83%]
-    max-w-[83%]
-      h-screen
-      overflow-y-auto
-      p-0
-    "
-  >
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        className="w-[83%] max-w-[83%] h-screen overflow-y-auto p-0 sm:max-w-[83%]"
+      >
+        <SheetHeader className="px-6 py-4 border-b bg-slate-50">
+          <SheetTitle className="text-lg font-semibold">
+            Add New Task
+          </SheetTitle>
+        </SheetHeader>
 
-
-
-<SheetHeader className="px-6 py-4 border-b bg-slate-50">
-  <SheetTitle className="text-lg font-semibold">
-    Add New Task
-  </SheetTitle>
-</SheetHeader>
-
-
-        {/* FORM */}
-        <div className="p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Title */}
-            <div className="lg:col-span-2">
-
+        <div className="grid grid-cols-1 gap-6 p-6 lg:grid-cols-2">
+          <div className="lg:col-span-2">
             <Label>Title *</Label>
-            <Input value={title} onChange={(e) => setTitle(e.target.value)} />
+            <Input value={title} onChange={(event) => setTitle(event.target.value)} />
           </div>
 
-       {/* Category */} 
-<div>
-  <Label>Category *</Label>
-  <Select onValueChange={setCategory}>
-    <SelectTrigger>
-      <SelectValue placeholder="Select category" />
-    </SelectTrigger>
-    <SelectContent>
-      {categories.map((c) => (
-        <SelectItem value={String(c.id)} key={c.id}>
-          {c.name}
-        </SelectItem>
-      ))}
-    </SelectContent>
-  </Select>
-</div>
+          <div>
+            <Label>Category *</Label>
+            <Select value={category} onValueChange={setCategory}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map((item) => (
+                  <SelectItem value={String(item.id)} key={item.id}>
+                    {item.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
-<div>
-  <Label>Project *</Label>
-  <Select onValueChange={setProjectId}>
-    <SelectTrigger>
-      <SelectValue placeholder="Select project" />
-    </SelectTrigger>
-    <SelectContent>
-      {projects.map((p) => (
-        <SelectItem value={String(p.id)} key={p.id}>
-          {p.shortCode} - {p.name}
-        </SelectItem>
-      ))}
-    </SelectContent>
-  </Select>
-</div>
+          <div>
+            <Label>Project *</Label>
+            <Select value={projectId} onValueChange={setProjectId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select project" />
+              </SelectTrigger>
+              <SelectContent>
+                {projects.map((project) => (
+                  <SelectItem value={String(project.id)} key={project.id}>
+                    {project.shortCode} - {project.name || project.projectName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
+          <div>
+            <Label>Milestone *</Label>
+            <Select value={milestoneId} onValueChange={setMilestoneId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select milestone" />
+              </SelectTrigger>
+              <SelectContent>
+                {milestones.map((item) => (
+                  <SelectItem value={String(item.id)} key={item.id}>
+                    {item.title}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
+          <div>
+            <Label>Task Stage *</Label>
+            <Select value={taskStageId} onValueChange={setTaskStageId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select stage" />
+              </SelectTrigger>
+              <SelectContent>
+                {stages.map((item) => (
+                  <SelectItem value={String(item.id)} key={item.id}>
+                    {item.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
 
+          {error ? (
+            <div className="lg:col-span-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+              {error}
+            </div>
+          ) : null}
 
-<div>
-  <Label>Milestone *</Label>
-  <Select onValueChange={setMilestoneId}>
-    <SelectTrigger>
-      <SelectValue placeholder="Select milestone" />
-    </SelectTrigger>
-    <SelectContent>
-      {milestones.map((m) => (
-        <SelectItem value={String(m.id)} key={m.id}>
-          {m.title}
-        </SelectItem>
-      ))}
-    </SelectContent>
-  </Select>
-</div>
-
-<div>
-  <Label>Task Stage *</Label>
-  <Select onValueChange={setTaskStageId}>
-    <SelectTrigger>
-      <SelectValue placeholder="Select stage" />
-    </SelectTrigger>
-    <SelectContent>
-      {stages.map((s) => (
-        <SelectItem value={String(s.id)} key={s.id}>
-          {s.name}
-        </SelectItem>
-      ))}
-    </SelectContent>
-  </Select>
-</div>
-
-
-
-          {/* Assigned Employees */}
           <div className="lg:col-span-2">
             <Label>Assign To *</Label>
             <div className="grid grid-cols-2 gap-2 pt-2">
-
-              {projectAssignedEmployees.length > 0
-                ? projectAssignedEmployees.map((emp) => (
-                  <div key={emp.employeeId} className="flex items-center gap-2">
+              {projectAssignedEmployees.length > 0 ? (
+                projectAssignedEmployees.map((employee) => (
+                  <div key={employee.employeeId} className="flex items-center gap-2">
                     <Checkbox
-                      checked={assignedEmployeeIds.includes(emp.employeeId)}
+                      checked={assignedEmployeeIds.includes(employee.employeeId)}
                       onCheckedChange={() =>
                         setAssignedEmployeeIds(
-                          toggle(assignedEmployeeIds, emp.employeeId)
+                          toggle(assignedEmployeeIds, employee.employeeId),
                         )
                       }
                     />
-                    <span className="text-sm">{emp.name}</span>
+                    <span className="text-sm">{employee.name}</span>
                   </div>
                 ))
-                : <p className="text-sm text-muted-foreground">No employees found</p>}
-
-
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  {projectId ? "No project members found" : "Select a project first"}
+                </p>
+              )}
             </div>
           </div>
 
-
-          {/* Labels */}
-         <div className="lg:col-span-2">
+          <div className="lg:col-span-2">
             <div className="flex items-center justify-between">
               <Label>Labels *</Label>
               <Button
@@ -389,74 +348,80 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
                 size="sm"
                 onClick={() => setLabelModalOpen(true)}
                 disabled={!projectId}
+                type="button"
               >
                 + Add Label
               </Button>
             </div>
 
             <div className="grid grid-cols-2 gap-2 pt-2">
-              {labels.map((l) => (
-                <div key={l.id} className="flex items-center gap-2">
+              {labels.map((label) => (
+                <div key={label.id} className="flex items-center gap-2">
                   <Checkbox
-                    checked={labelIds.includes(String(l.id))}
+                    checked={labelIds.includes(String(label.id))}
                     onCheckedChange={() =>
-                      setLabelIds(toggle(labelIds, String(l.id)))
+                      setLabelIds(toggle(labelIds, String(label.id)))
                     }
                   />
                   <span className="flex items-center gap-2">
                     <span
                       className="h-3 w-3 rounded-full"
-                      style={{ backgroundColor: l.colorCode }}
+                      style={{ backgroundColor: label.colorCode ?? "#94a3b8" }}
                     />
-                    {l.name}
+                    {label.name}
                   </span>
                 </div>
               ))}
             </div>
           </div>
+
           <AddLabelModal
             open={labelModalOpen}
             onOpenChange={setLabelModalOpen}
             projectId={projectId}
-            onCreated={() => fetchLabels(projectId)}
+            onCreated={() => {
+              if (!projectId || !token) return;
+
+              void (async () => {
+                try {
+                  setLabels(await fetchProjectLabels(token, projectId));
+                } catch (err) {
+                  console.error(err);
+                  setError(err instanceof Error ? err.message : "Failed to refresh labels");
+                }
+              })();
+            }}
           />
 
-         
+          <div>
+            <Label>Start Date *</Label>
+            <Input
+              type="date"
+              value={startDate}
+              onChange={(event) => setStartDate(event.target.value)}
+            />
+          </div>
 
-<div>
-  <Label>Start Date *</Label>
-  <Input
-    type="date"
-    value={startDate}
-    onChange={(e) => setStartDate(e.target.value)}
-  />
-</div>
+          <div>
+            <Label>Due Date *</Label>
+            <Input
+              type="date"
+              value={dueDate}
+              onChange={(event) => setDueDate(event.target.value)}
+            />
+          </div>
 
-<div>
-  <Label>Due Date *</Label>
-  <Input
-    type="date"
-    value={dueDate}
-    onChange={(e) => setDueDate(e.target.value)}
-  />
-</div>
+          <div className="lg:col-span-2">
+            <Label>Description *</Label>
+            <Textarea
+              value={description}
+              onChange={(event) => setDescription(event.target.value)}
+            />
+          </div>
 
-
-        
-
-<div className="lg:col-span-2">
-  <Label>Description *</Label>
-  <Textarea
-    value={description}
-    onChange={(e) => setDescription(e.target.value)}
-  />
-</div>
-
-
-          {/* Priority */}
           <div>
             <Label>Priority *</Label>
-            <Select onValueChange={setPriority}>
+            <Select value={priority} onValueChange={setPriority}>
               <SelectTrigger>
                 <SelectValue placeholder="Select priority" />
               </SelectTrigger>
@@ -468,12 +433,11 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
             </Select>
           </div>
 
-          {/* Toggles */}
           <div className="grid grid-cols-2 gap-3">
             <div className="flex gap-2 items-center">
               <Checkbox
                 checked={isPrivate}
-                onCheckedChange={(v) => setIsPrivate(Boolean(v))}
+                onCheckedChange={(value) => setIsPrivate(Boolean(value))}
               />
               <span>Private Task</span>
             </div>
@@ -481,7 +445,7 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
             <div className="flex gap-2 items-center">
               <Checkbox
                 checked={isDependent}
-                onCheckedChange={(v) => setIsDependent(Boolean(v))}
+                onCheckedChange={(value) => setIsDependent(Boolean(value))}
               />
               <span>Dependent Task</span>
             </div>
@@ -489,37 +453,35 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
             <div className="flex gap-2 items-center">
               <Checkbox
                 checked={timeEstimate}
-                onCheckedChange={(v) => setTimeEstimate(Boolean(v))}
+                onCheckedChange={(value) => setTimeEstimate(Boolean(value))}
               />
               <span>Time Estimate</span>
             </div>
 
-            {timeEstimate && (
+            {timeEstimate ? (
               <Input
                 placeholder="Minutes"
                 value={timeEstimateMinutes}
-                onChange={(e) => setTimeEstimateMinutes(e.target.value)}
+                onChange={(event) => setTimeEstimateMinutes(event.target.value)}
               />
-            )}
+            ) : null}
           </div>
 
-          {/* File Upload */}
-        <div className="lg:col-span-2">
-            <Label>Attachment *</Label>
+          <div className="lg:col-span-2">
+            <Label>Attachment</Label>
             <Input
               type="file"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
             />
           </div>
         </div>
 
-        {/* FOOTER */}
         <div className="sticky bottom-0 bg-white border-t px-6 py-4 flex justify-end gap-3">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => onOpenChange(false)} type="button">
             Cancel
           </Button>
 
-          <Button onClick={handleSave} disabled={loading}>
+          <Button onClick={handleSave} disabled={loading} type="button">
             {loading ? (
               <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
@@ -527,10 +489,7 @@ export const AddTaskModal: React.FC<AddTaskModalProps> = ({
             )}
           </Button>
         </div>
-     
-
-
-    </SheetContent>
-</Sheet>
+      </SheetContent>
+    </Sheet>
   );
 };

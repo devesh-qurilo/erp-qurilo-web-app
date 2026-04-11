@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2 } from "lucide-react";
+import { createTaskLabel, getStoredAccessToken } from "../api";
 
 interface Props {
   open: boolean;
@@ -26,39 +27,32 @@ export const AddLabelModal: React.FC<Props> = ({
   projectId,
   onCreated,
 }) => {
-  const MAIN = process.env.NEXT_PUBLIC_MAIN;
-  const token = localStorage.getItem("accessToken");
-
   const [name, setName] = useState("");
   const [colorCode, setColorCode] = useState("#000000");
   const [description, setDescription] = useState("");
   const [loading, setLoading] = useState(false);
 
   const handleSave = async () => {
+    const token = getStoredAccessToken();
+    if (!token) {
+      alert("Not authenticated");
+      return;
+    }
+
     try {
       setLoading(true);
-
-      const res = await fetch(`${MAIN}/api/labels`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          name,
-          colorCode,
-          projectId: Number(projectId),
-          description,
-        }),
+      await createTaskLabel(token, {
+        name,
+        colorCode,
+        projectId: Number(projectId),
+        description,
       });
-
-      if (!res.ok) throw new Error("Failed");
 
       onCreated(); // refresh labels
       onOpenChange(false);
       setName("");
       setDescription("");
-    } catch (e) {
+    } catch {
       alert("Failed to create label");
     } finally {
       setLoading(false);

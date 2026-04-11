@@ -1,47 +1,59 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Trash2, Pencil } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+    createTaskSubtask,
+    deleteTaskSubtask,
+    fetchTaskSubtasks,
+    getStoredAccessToken,
+    toggleTaskSubtask,
+    updateTaskSubtask,
+    type TaskSubtaskRecord,
+} from "../../../api";
 
-const MAIN_API = process.env.NEXT_PUBLIC_MAIN;
+interface SubTasksTabProps {
+    taskId: number;
+}
 
-export default function SubTasksTab({ taskId }) {
-    const [subtasks, setSubtasks] = useState([]);
+export default function SubTasksTab({ taskId }: SubTasksTabProps) {
+    const [subtasks, setSubtasks] = useState<TaskSubtaskRecord[]>([]);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
 
-    const [editId, setEditId] = useState(null); // subtask being edited
+    const [editId, setEditId] = useState<number | null>(null);
 
-    useEffect(() => {
-        fetchSubtasks();
-    }, [taskId]);
+    const fetchSubtasks = useCallback(async () => {
+        const token = getStoredAccessToken();
+        if (!token) {
+            setSubtasks([]);
+            setError("Not authenticated");
+            return;
+        }
 
-    /* --------------------------------------------
-     * GET ALL SUBTASKS
-     * -------------------------------------------- */
-    async function fetchSubtasks() {
         try {
             setLoading(true);
-            const token = localStorage.getItem("accessToken");
-
-            const res = await fetch(`${MAIN_API}/tasks/${taskId}/subtasks`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            const data = await res.json();
-            setSubtasks(data || []);
+            setError(null);
+            setSubtasks(await fetchTaskSubtasks(token, taskId));
         } catch (err) {
             console.error("Subtask fetch error:", err);
+            setError(err instanceof Error ? err.message : "Failed to fetch subtasks");
         } finally {
             setLoading(false);
         }
-    }
+    }, [taskId]);
+
+    useEffect(() => {
+        void fetchSubtasks();
+    }, [fetchSubtasks]);
 
     /* --------------------------------------------
      * CREATE SUBTASK
@@ -49,75 +61,83 @@ export default function SubTasksTab({ taskId }) {
     async function handleCreate() {
         if (!title.trim()) return alert("Title is required");
 
+        const token = getStoredAccessToken();
+        if (!token) {
+            setError("Not authenticated");
+            return;
+        }
+
         try {
-            const token = localStorage.getItem("accessToken");
-
-            const res = await fetch(`${MAIN_API}/tasks/${taskId}/subtasks`, {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ title, description }),
-            });
-
-            if (!res.ok) throw new Error("Failed to add subtask");
-
+            setError(null);
+            await createTaskSubtask(token, taskId, { title, description });
             setTitle("");
             setDescription("");
-            fetchSubtasks();
+            await fetchSubtasks();
         } catch (err) {
             console.error("Create error:", err);
+            setError(err instanceof Error ? err.message : "Failed to add subtask");
         }
     }
 
     /* --------------------------------------------
      * UPDATE SUBTASK
      * -------------------------------------------- */
-    async function handleUpdate(subtaskId) {
+    async function handleUpdate(subtaskId: number) {
+        const token = getStoredAccessToken();
+        if (!token) {
+            setError("Not authenticated");
+            return;
+        }
+
         try {
-            const token = localStorage.getItem("accessToken");
-
-            const res = await fetch(
-                `${MAIN_API}/tasks/${taskId}/subtasks/${subtaskId}`,
-                {
-                    method: "PUT",
-                    headers: {
-                        Authorization: `Bearer ${token}`,
-                        "Content-Type": "application/json",
-                    },
-                    body: JSON.stringify({ title, description }),
-                }
-            );
-
-            if (!res.ok) throw new Error("Update failed");
-
+            setError(null);
+            await updateTaskSubtask(token, taskId, subtaskId, { title, description });
             setEditId(null);
             setTitle("");
             setDescription("");
-            fetchSubtasks();
+            await fetchSubtasks();
         } catch (err) {
             console.error("Update error:", err);
+            setError(err instanceof Error ? err.message : "Failed to update subtask");
         }
     }
 
     /* --------------------------------------------
      * DELETE SUBTASK
      * -------------------------------------------- */
-    async function handleDelete(subtaskId) {
+    async function handleDelete(subtaskId: number) {
         if (!confirm("Delete this subtask?")) return;
 
+        const token = getStoredAccessToken();
+        if (!token) {
+            setError("Not authenticated");
+            return;
+        }
+
         try {
-            const token = localStorage.getItem("accessToken");
-
-            await fetch(`${MAIN_API}/tasks/${taskId}/subtasks/${subtaskId}`, {
-                method: "DELETE",
-                headers: { Authorization: `Bearer ${token}` },
-            });
-
+            setError(null);
+            await deleteTaskSubtask(token, taskId, subtaskId);
             setSubtasks((prev) => prev.filter((s) => s.id !== subtaskId));
         } catch (err) {
             console.error("Delete error:", err);
+            setError(err instanceof Error ? err.message : "Failed to delete subtask");
+        }
+    }
+
+    async function handleToggle(subtaskId: number) {
+        const token = getStoredAccessToken();
+        if (!token) {
+            setError("Not authenticated");
+            return;
+        }
+
+        try {
+            setError(null);
+            const updated = await toggleTaskSubtask(token, taskId, subtaskId);
+            setSubtasks((prev) => prev.map((item) => (item.id === subtaskId ? updated : item)));
+        } catch (err) {
+            console.error("Toggle error:", err);
+            setError(err instanceof Error ? err.message : "Failed to update subtask");
         }
     }
 
@@ -173,6 +193,8 @@ export default function SubTasksTab({ taskId }) {
                 </div>
             </Card>
 
+            {error ? <p className="text-sm text-red-500">{error}</p> : null}
+
             {/* ------------ SUBTASKS LIST ------------ */}
             {loading ? (
                 <div className="flex justify-center py-10">
@@ -187,13 +209,22 @@ export default function SubTasksTab({ taskId }) {
                             key={sub.id}
                             className="p-4 rounded-xl border-slate-200 flex justify-between items-start"
                         >
-                            <div>
+                            <div className="flex items-start gap-3">
+                                <Checkbox
+                                    checked={Boolean(sub.isDone)}
+                                    onCheckedChange={() => {
+                                        void handleToggle(sub.id);
+                                    }}
+                                />
+
+                                <div>
                                 <p className="font-medium text-slate-700">
                                     {sub.title}
                                 </p>
                                 <p className="text-slate-500 text-sm">
-                                    {sub.description}
+                                    {sub.description || "No description"}
                                 </p>
+                                </div>
                             </div>
 
                             <div className="flex gap-3">

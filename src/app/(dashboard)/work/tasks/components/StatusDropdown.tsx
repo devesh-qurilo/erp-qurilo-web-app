@@ -7,22 +7,36 @@ import {
     DropdownMenuContent,
     DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
+import {
+    changeTaskStage,
+    fetchTaskStages,
+    getStoredAccessToken,
+    type TaskStageRecord,
+} from "../api";
 
-export default function StatusDropdown({ task }) {
-    const MAIN = process.env.NEXT_PUBLIC_MAIN;
-    const token = typeof window !== "undefined" ? window.localStorage.getItem("accessToken") : null
+interface StatusDropdownProps {
+    task: {
+        id: number;
+        taskStage?: {
+            id?: number;
+            name?: string;
+            labelColor?: string | null;
+        } | null;
+    };
+    onUpdated?: () => void;
+}
 
-    const [stages, setStages] = useState([]);
+export default function StatusDropdown({ task, onUpdated }: StatusDropdownProps) {
+    const [stages, setStages] = useState<TaskStageRecord[]>([]);
     const [current, setCurrent] = useState(task.taskStage);
     const [loading, setLoading] = useState(false);
 
     // -------- Fetch all Stages --------
     const fetchStages = async () => {
         try {
-            const res = await fetch(`${MAIN}/status`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            const data = await res.json();
+            const token = getStoredAccessToken();
+            if (!token) return;
+            const data = await fetchTaskStages(token);
             setStages(data);
         } catch (err) {
             console.error("Stage fetch error:", err);
@@ -33,32 +47,24 @@ export default function StatusDropdown({ task }) {
         fetchStages();
     }, []);
 
+    useEffect(() => {
+        setCurrent(task.taskStage);
+    }, [task.taskStage]);
+
     // -------- Update Stage (PATCH) --------
     const updateStatus = async (stageId: string) => {
         try {
             setLoading(true);
-
-            const url = `${MAIN}/api/projects/tasks/${task.id}/status?statusId=${stageId}`;
-
-
-            const res = await fetch(url, {
-                method: "PATCH",
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Length": "0"      // SUPER IMPORTANT
-                }
-            });
-
-            if (!res.ok) {
-                const msg = await res.text();
-                console.error("Backend says:", msg);
-                throw new Error("Failed to update stage");
+            const token = getStoredAccessToken();
+            if (!token) {
+                throw new Error("Not authenticated");
             }
 
-            const updated = await res.json();
+            await changeTaskStage(token, task.id, Number(stageId));
 
             const newStage = stages.find((s) => String(s.id) === stageId);
             setCurrent(newStage);
+            onUpdated?.();
 
         } catch (err) {
             console.error("Update error:", err);

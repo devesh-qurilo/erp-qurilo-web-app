@@ -1,40 +1,46 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Loader2 } from "lucide-react";
+import {
+    fetchTaskTimesheet,
+    getStoredAccessToken,
+    type TaskTimeLogRecord,
+} from "../../../api";
 
-const MAIN_API = process.env.NEXT_PUBLIC_MAIN;
+interface TimesheetTabProps {
+    taskId: number;
+}
 
-export default function TimesheetTab({ taskId }) {
-    const [records, setRecords] = useState([]);
+export default function TimesheetTab({ taskId }: TimesheetTabProps) {
+    const [records, setRecords] = useState<TaskTimeLogRecord[]>([]);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        fetchTimesheet();
-    }, [taskId]);
+    const fetchTimesheet = useCallback(async () => {
+        const token = getStoredAccessToken();
+        if (!token) {
+            setRecords([]);
+            setError("Not authenticated");
+            return;
+        }
 
-    /* --------------------------------------------
-     * GET timesheet records for this task
-     * -------------------------------------------- */
-    async function fetchTimesheet() {
         try {
             setLoading(true);
-            const token = localStorage.getItem("accessToken");
-
-            const res = await fetch(
-                `${MAIN_API}/timesheets/task/${taskId}`,
-                { headers: { Authorization: `Bearer ${token}` } }
-            );
-
-            const data = await res.json();
-            setRecords(data || []);
+            setError(null);
+            setRecords(await fetchTaskTimesheet(token, taskId));
         } catch (err) {
             console.error("Timesheet fetch error:", err);
+            setError(err instanceof Error ? err.message : "Failed to load timesheet");
         } finally {
             setLoading(false);
         }
-    }
+    }, [taskId]);
+
+    useEffect(() => {
+        void fetchTimesheet();
+    }, [fetchTimesheet]);
 
     return (
         <div className="space-y-6">
@@ -44,6 +50,8 @@ export default function TimesheetTab({ taskId }) {
                 <div className="flex justify-center py-10">
                     <Loader2 className="animate-spin text-slate-400" size={26} />
                 </div>
+            ) : error ? (
+                <p className="text-sm text-red-500">{error}</p>
             ) : records.length === 0 ? (
                 <p className="text-slate-500 text-sm">No timesheet entries found.</p>
             ) : (
@@ -78,7 +86,7 @@ export default function TimesheetTab({ taskId }) {
                                         )}
                                         <div>
                                             <p className="font-medium text-slate-700">
-                                                {rec.employees?.[0]?.name || "Unknown"}
+                                                {rec.employees?.[0]?.name || rec.employeeId || "Unknown"}
                                             </p>
                                             <p className="text-xs text-slate-500">
                                                 {rec.employees?.[0]?.designation || ""}

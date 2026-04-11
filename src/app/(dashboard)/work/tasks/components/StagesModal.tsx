@@ -12,6 +12,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Pencil, Trash2, Loader2, Plus } from "lucide-react";
+import {
+    createTaskStage,
+    deleteTaskStageDefinition,
+    fetchTaskStages,
+    getStoredAccessToken,
+    updateTaskStageDefinition,
+} from "../api";
 
 interface Stage {
     id: number;
@@ -29,8 +36,6 @@ export const StagesModal: React.FC<StagesModalProps> = ({
     open,
     onOpenChange,
 }) => {
-    const API = process.env.NEXT_PUBLIC_MAIN;
-
     const [loading, setLoading] = useState(false);
     const [stages, setStages] = useState<Stage[]>([]);
 
@@ -49,13 +54,9 @@ export const StagesModal: React.FC<StagesModalProps> = ({
     // ---------------- LOAD STAGES ----------------
     const fetchStages = async () => {
         try {
-            const token = typeof window !== "undefined" ? window.localStorage.getItem("accessToken") : null
-            const res = await fetch(`${API}/status`, {
-                // TODO: yaha pe agar token chahiye ho to header add karna
-                headers: { Authorization: `Bearer ${token}` },
-                // credentials: "include",
-            });
-            const data = await res.json();
+            const token = getStoredAccessToken();
+            if (!token) return;
+            const data = await fetchTaskStages(token);
             setStages(data);
         } catch (err) {
             console.error("Failed to load stages", err);
@@ -69,7 +70,10 @@ export const StagesModal: React.FC<StagesModalProps> = ({
     // ---------------- SAVE (ADD / UPDATE) ----------------
     const handleSave = async () => {
         try {
-            const token = typeof window !== "undefined" ? window.localStorage.getItem("accessToken") : null
+            const token = getStoredAccessToken();
+            if (!token) {
+                throw new Error("Not authenticated");
+            }
             setLoading(true);
 
             const body = {
@@ -78,24 +82,10 @@ export const StagesModal: React.FC<StagesModalProps> = ({
                 labelColor,
             };
 
-            const method = editId ? "PUT" : "POST";
-            const url = editId
-                ? `${API}/status/${editId}`
-                : `${API}/status`;
-            const res = await fetch(url, {
-                method,
-                // TODO: yaha pe agar token chahiye ho to header add karna
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json"
-                },
-                // credentials: "include",
-
-                body: JSON.stringify(body),
-            });
-
-            if (!res.ok) {
-                throw new Error("Failed");
+            if (editId) {
+                await updateTaskStageDefinition(token, editId, body);
+            } else {
+                await createTaskStage(token, body);
             }
 
             resetForm();
@@ -114,18 +104,12 @@ export const StagesModal: React.FC<StagesModalProps> = ({
 
         try {
             setLoading(true);
+            const token = getStoredAccessToken();
+            if (!token) {
+                throw new Error("Not authenticated");
+            }
 
-            const token = typeof window !== "undefined" ? window.localStorage.getItem("accessToken") : null
-
-            const res = await fetch(`${API}/status/${id}`, {
-                method: "DELETE",
-                // TODO: yaha pe agar token chahiye ho to header add karna
-                headers: { Authorization: `Bearer ${token}` },
-                // credentials: "include",
-
-            });
-
-            if (!res.ok) throw new Error("Failed");
+            await deleteTaskStageDefinition(token, id);
 
             fetchStages();
         } catch (err) {

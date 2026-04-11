@@ -1,46 +1,55 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Loader2, Trash2 } from "lucide-react";
+import {
+    createTaskNote,
+    deleteTaskNote,
+    fetchTaskNotes,
+    getStoredAccessToken,
+    type TaskNoteRecord,
+} from "../../../api";
 
-const MAIN_API = process.env.NEXT_PUBLIC_MAIN;
+interface NotesTabProps {
+    taskId: number;
+}
 
-export default function NotesTab({ taskId }) {
-    const [notes, setNotes] = useState([]);
+export default function NotesTab({ taskId }: NotesTabProps) {
+    const [notes, setNotes] = useState<TaskNoteRecord[]>([]);
     const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
     const [title, setTitle] = useState("");
     const [content, setContent] = useState("");
     const [isPublic, setIsPublic] = useState(true);
 
-    useEffect(() => {
-        fetchNotes();
-    }, [taskId]);
+    const fetchNotes = useCallback(async () => {
+        const token = getStoredAccessToken();
+        if (!token) {
+            setNotes([]);
+            setError("Not authenticated");
+            return;
+        }
 
-    /* ------------------------------
-     * GET Notes for task
-     * ------------------------------ */
-    async function fetchNotes() {
         try {
             setLoading(true);
-            const token = localStorage.getItem("accessToken");
-
-            const res = await fetch(`${MAIN_API}/tasks/${taskId}/notes`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-
-            const data = await res.json();
-            setNotes(data || []);
+            setError(null);
+            setNotes(await fetchTaskNotes(token, taskId));
         } catch (err) {
             console.error("Notes fetch error:", err);
+            setError(err instanceof Error ? err.message : "Failed to load notes");
         } finally {
             setLoading(false);
         }
-    }
+    }, [taskId]);
+
+    useEffect(() => {
+        void fetchNotes();
+    }, [fetchNotes]);
 
     /* ------------------------------
      * CREATE Note
@@ -50,51 +59,47 @@ export default function NotesTab({ taskId }) {
             return alert("Title and content are required");
         }
 
+        const token = getStoredAccessToken();
+        if (!token) {
+            setError("Not authenticated");
+            return;
+        }
+
         try {
-            const token = localStorage.getItem("accessToken");
-
-            const res = await fetch(`${MAIN_API}/tasks/${taskId}/notes`, {
-                method: "POST",
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                    "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                    title,
-                    content,
-                    isPublic,
-                }),
+            setError(null);
+            const newNote = await createTaskNote(token, taskId, {
+                title,
+                content,
+                isPublic,
             });
-
-            if (!res.ok) throw new Error("Failed to create note");
-
-            const newNote = await res.json();
-
             setNotes((prev) => [newNote, ...prev]);
             setTitle("");
             setContent("");
         } catch (err) {
             console.error("Create note error:", err);
+            setError(err instanceof Error ? err.message : "Failed to create note");
         }
     }
 
     /* ------------------------------
      * DELETE Note
      * ------------------------------ */
-    async function handleDelete(noteId) {
+    async function handleDelete(noteId: number) {
         if (!confirm("Delete this note?")) return;
 
+        const token = getStoredAccessToken();
+        if (!token) {
+            setError("Not authenticated");
+            return;
+        }
+
         try {
-            const token = localStorage.getItem("accessToken");
-
-            await fetch(`${MAIN_API}/notes/task/${noteId}`, {
-                method: "DELETE",
-                headers: { Authorization: `Bearer ${token}` },
-            });
-
+            setError(null);
+            await deleteTaskNote(token, noteId);
             setNotes((prev) => prev.filter((n) => n.id !== noteId));
         } catch (err) {
             console.error("Delete error:", err);
+            setError(err instanceof Error ? err.message : "Failed to delete note");
         }
     }
 
@@ -138,6 +143,8 @@ export default function NotesTab({ taskId }) {
                 </div>
             </Card>
 
+            {error ? <p className="text-sm text-red-500">{error}</p> : null}
+
             {/* --- NOTES LIST --- */}
             {loading ? (
                 <div className="flex justify-center py-10">
@@ -155,7 +162,7 @@ export default function NotesTab({ taskId }) {
                             <div className="flex justify-between">
                                 <div>
                                     <p className="font-medium text-slate-800">
-                                        {note.title}
+                                        {note.title || "Untitled note"}
                                     </p>
                                     <p className="text-xs text-slate-500">
                                         {note.isPublic ? "Public" : "Private"}
@@ -171,7 +178,7 @@ export default function NotesTab({ taskId }) {
                             </div>
 
                             <p className="mt-3 text-sm text-slate-700">
-                                {note.content}
+                                {note.content || "No note content"}
                             </p>
 
                             <p className="mt-2 text-xs text-slate-400">

@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
-  X,
   Search,
   List,
   CalendarDays,
@@ -12,10 +11,10 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
+import { fetchMyProjectTasks, getStoredAccessToken, type TaskDetailRecord } from "../../api";
 
 const DEFAULT_API_BASE = `${process.env.NEXT_PUBLIC_MAIN}`;
 const ENDPOINT = "/timesheets/weekly";
-const API_TIMEOUT_MS = 15000;
 
 const WEEKDAY_LABELS = ["Mon", "Tue", "Wed", "Thurs", "Fri", "Sat", "Sun"];
 const MONTH_NAMES = [
@@ -55,8 +54,8 @@ type TaskItem = {
 };
 
 const WeeklyTimesheetModal: React.FC<WeeklyTimesheetModalProps> = ({
-  open,
-  onClose,
+  open: _open,
+  onClose: _onClose,
   apiBaseUrl = DEFAULT_API_BASE,
   authToken = null,
 }) => {
@@ -80,43 +79,38 @@ const WeeklyTimesheetModal: React.FC<WeeklyTimesheetModalProps> = ({
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [loadingTasks, setLoadingTasks] = useState(false);
 
-  function getEffectiveToken() {
-    try {
-      const t = localStorage.getItem("accessToken");
-      if (t && t.trim() !== "") return t.trim();
-    } catch { }
-    return authToken ?? null;
-  }
+  void _open;
+  void _onClose;
 
-  useEffect(() => {
-    fetchMyTasks();
-  }, []);
+  const getEffectiveToken = useCallback(
+    () => getStoredAccessToken() ?? authToken ?? null,
+    [authToken],
+  );
 
-  async function fetchMyTasks() {
+  const fetchMyTasks = useCallback(async () => {
     setLoadingTasks(true);
     const token = getEffectiveToken();
 
     try {
-      const res = await fetch(`${apiBaseUrl}/me/tasks`, {
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
-      });
+      if (!token) throw new Error("Missing auth token");
 
-      if (!res.ok) throw new Error("Failed to fetch tasks");
-
-      const json = await res.json();
-
+      const json = await fetchMyProjectTasks<TaskDetailRecord>(token);
       setTasks(
-        json.map((t: any) => ({
+        json.map((t) => ({
           id: t.id,
           title: t.title,
           projectShortCode: t.projectShortCode,
         }))
       );
-    } catch (err) {
+    } catch {
     } finally {
       setLoadingTasks(false);
     }
-  }
+  }, [getEffectiveToken]);
+
+  useEffect(() => {
+    void fetchMyTasks();
+  }, [fetchMyTasks]);
 
   function openCalendar() {
     dateInputRef.current?.showPicker?.();
@@ -211,7 +205,7 @@ const WeeklyTimesheetModal: React.FC<WeeklyTimesheetModalProps> = ({
       }
 
       setSaveResults("Saved successfully.");
-    } catch (err: any) {
+    } catch {
       setSaveResults("Save failed.");
     } finally {
       setLoadingSave(false);

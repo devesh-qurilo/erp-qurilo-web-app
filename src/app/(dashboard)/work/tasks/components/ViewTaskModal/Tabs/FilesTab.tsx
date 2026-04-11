@@ -1,41 +1,49 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Loader2, Trash2, Upload } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+    deleteProjectFile,
+    fetchTaskFiles,
+    getStoredAccessToken,
+    uploadTaskFile,
+    type TaskFileRecord,
+} from "../../../api";
 
-const MAIN_API = process.env.NEXT_PUBLIC_MAIN;
+interface FilesTabProps {
+    taskId: number;
+}
 
-export default function FilesTab({ taskId }) {
-    const [files, setFiles] = useState([]);
+export default function FilesTab({ taskId }: FilesTabProps) {
+    const [files, setFiles] = useState<TaskFileRecord[]>([]);
     const [loading, setLoading] = useState(false);
     const [uploading, setUploading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        fetchFiles();
-    }, [taskId]);
+    const fetchFiles = useCallback(async () => {
+        const token = getStoredAccessToken();
+        if (!token) {
+            setFiles([]);
+            setError("Not authenticated");
+            return;
+        }
 
-    /* --------------------------------------------
-     * GET all files
-     * -------------------------------------------- */
-    async function fetchFiles() {
         try {
             setLoading(true);
-            const token = localStorage.getItem("accessToken");
-
-            const res = await fetch(`${MAIN_API}/files/tasks/${taskId}`, {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-
-            const data = await res.json();
-            setFiles(data || []);
+            setError(null);
+            setFiles(await fetchTaskFiles(token, taskId));
         } catch (err) {
             console.error("Error fetching files:", err);
+            setError(err instanceof Error ? err.message : "Failed to load files");
         } finally {
             setLoading(false);
         }
-    }
+    }, [taskId]);
+
+    useEffect(() => {
+        void fetchFiles();
+    }, [fetchFiles]);
 
     /* --------------------------------------------
      * Upload file
@@ -44,24 +52,21 @@ export default function FilesTab({ taskId }) {
         const file = e.target.files?.[0];
         if (!file) return;
 
-        const fd = new FormData();
-        fd.append("file", file);
+        const token = getStoredAccessToken();
+        if (!token) {
+            setError("Not authenticated");
+            return;
+        }
+
 
         try {
             setUploading(true);
-            const token = localStorage.getItem("accessToken");
-
-            const res = await fetch(`${MAIN_API}/files/tasks/${taskId}`, {
-                method: "POST",
-                headers: { Authorization: `Bearer ${token}` },
-                body: fd,
-            });
-
-            if (!res.ok) throw new Error("Upload failed");
-
-            fetchFiles(); // refresh list
+            setError(null);
+            await uploadTaskFile(token, taskId, file);
+            await fetchFiles();
         } catch (err) {
             console.error("File upload error:", err);
+            setError(err instanceof Error ? err.message : "Upload failed");
         } finally {
             setUploading(false);
         }
@@ -73,17 +78,19 @@ export default function FilesTab({ taskId }) {
     async function handleDelete(fileId) {
         if (!confirm("Delete this file?")) return;
 
+        const token = getStoredAccessToken();
+        if (!token) {
+            setError("Not authenticated");
+            return;
+        }
+
         try {
-            const token = localStorage.getItem("accessToken");
-
-            await fetch(`${MAIN_API}/files/${fileId}`, {
-                method: "DELETE",
-                headers: { Authorization: `Bearer ${token}` },
-            });
-
+            setError(null);
+            await deleteProjectFile(token, fileId);
             setFiles((prev) => prev.filter((f) => f.id !== fileId));
         } catch (err) {
             console.error("Delete error:", err);
+            setError(err instanceof Error ? err.message : "Delete failed");
         }
     }
 
@@ -105,6 +112,10 @@ export default function FilesTab({ taskId }) {
                 <p className="text-xs text-slate-500">Uploading...</p>
             )}
 
+            {error ? (
+                <p className="text-xs text-red-500">{error}</p>
+            ) : null}
+
             {/* Files List */}
             {loading ? (
                 <div className="flex justify-center py-10">
@@ -122,10 +133,10 @@ export default function FilesTab({ taskId }) {
                             {/* Left: file info */}
                             <div>
                                 <p className="font-medium text-slate-700 text-sm">
-                                    {file.filename}
+                                    {file.filename ?? "Untitled file"}
                                 </p>
                                 <a
-                                    href={file.url}
+                                    href={file.url ?? "#"}
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     className="text-indigo-600 text-xs underline"
